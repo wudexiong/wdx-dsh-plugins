@@ -1,4 +1,4 @@
-// wdx-pocket 网页客户端：
+// dsh-wdx-pocket 网页客户端：
 //   1. 设置页签「手机访问」（局域网/公网二维码 + 更新/重启提示）
 //   2. 移动端适配（移植自 MIT 项目 dsh-web-mobile，见 client/mobile/LICENSE.dsh-web-mobile）
 //
@@ -9,10 +9,10 @@
 
 import { createElement as h, useEffect, useState } from 'react';
 
-import { POCKET_RPC_CHANNEL, POCKET_ENDPOINTS, redactStatus, compareVersions } from './api.js';
+import { POCKET_RPC_CHANNEL, POCKET_ENDPOINTS, redactStatus, compareVersions, POCKET_TUNNEL_MODES, POCKET_TUNNEL_MODE_LABELS } from './api.js';
 import { mobileApply } from './mobile/mobile-apply.tsx';
 
-const name = 'wdx-pocket';
+const name = 'dsh-wdx-pocket';
 const inject = ['slots', 'connection', 'layout', 'locale', 'sessionLogDownload'];
 
 const styles = {
@@ -24,6 +24,9 @@ const styles = {
   btn: { font: 'inherit', cursor: 'pointer', border: '1px solid var(--dsw-alias-border-l2,#e5e7eb)', background: 'var(--dsw-alias-bg-layer-1,#fff)', borderRadius: 8, padding: '6px 14px', fontSize: 13 },
   qr: { width: 220, height: 220, borderRadius: 8, border: '1px solid var(--dsw-alias-border-l2,#e5e7eb)', margin: '6px 0' },
   warn: { color: 'var(--dsw-alias-state-warn-primary,#b45309)', fontSize: 12 },
+  input: { font: 'inherit', width: '100%', boxSizing: 'border-box', border: '1px solid var(--dsw-alias-border-l2,#e5e7eb)', background: 'var(--dsw-alias-bg-layer-1,#fff)', color: 'inherit', borderRadius: 8, padding: '6px 10px', fontSize: 13, marginTop: 4 },
+  label: { fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)' },
+  select: { font: 'inherit', border: '1px solid var(--dsw-alias-border-l2,#e5e7eb)', background: 'var(--dsw-alias-bg-layer-1,#fff)', color: 'inherit', borderRadius: 8, padding: '6px 10px', fontSize: 13, marginTop: 4, width: '100%' },
 };
 
 function PocketSettingsTab({ rpcCall }) {
@@ -33,6 +36,18 @@ function PocketSettingsTab({ rpcCall }) {
   const [tunnelState, setTunnelState] = useState(null); // 隧道进度 {phase, detail, startedAt}
   const [restartNotice, setRestartNotice] = useState(false); // 重启后提示
   const [updateInfo, setUpdateInfo] = useState(null); // { current, latest, updating, result } | null
+  // 公网模式与配置表单（三模式可切换；配置持久化在 host 侧，重启不丢）
+  const [mode, setMode] = useState('quick');
+  const [modeTouched, setModeTouched] = useState(false); // 用户是否手动切过模式
+  const [namedTunnelName, setNamedTunnelName] = useState('');
+  const [namedCredsDir, setNamedCredsDir] = useState('');
+  const [namedUrl, setNamedUrl] = useState('');
+  const [frpServerAddr, setFrpServerAddr] = useState('');
+  const [frpServerPort, setFrpServerPort] = useState('7000');
+  const [frpToken, setFrpToken] = useState('');
+  const [frpCustomDomains, setFrpCustomDomains] = useState('');
+  const [frpRemotePort, setFrpRemotePort] = useState('');
+  const [frpFrpcPath, setFrpFrpcPath] = useState('');
 
   const call = async (endpoint, payload) => {
     const res = await rpcCall(endpoint, payload);
@@ -76,7 +91,7 @@ function PocketSettingsTab({ rpcCall }) {
     (async () => {
       try {
         const v = await call(POCKET_ENDPOINTS.version, {});
-        const meta = await (await fetch('https://registry.npmjs.org/wdx-pocket/latest')).json();
+        const meta = await (await fetch('https://registry.npmjs.org/dsh-wdx-pocket/latest')).json();
         if (!alive) return;
         const latest = typeof meta?.version === 'string' ? meta.version : null;
         if (latest && v.current && compareVersions(latest, v.current) > 0) {
@@ -132,8 +147,25 @@ function PocketSettingsTab({ rpcCall }) {
     setBusy(true);
     setError(null);
     setTunnelState({ phase: 'starting', detail: '正在开启…', startedAt: Date.now() });
+    // 按当前模式组装配置（host 会合并已保存配置并持久化）
+    const config = mode === 'named'
+      ? {
+          tunnelName: namedTunnelName.trim(),
+          credsDir: namedCredsDir.trim() || undefined,
+          url: namedUrl.trim() || undefined,
+        }
+      : mode === 'frp'
+        ? {
+            serverAddr: frpServerAddr.trim(),
+            serverPort: Number(frpServerPort) || 7000,
+            token: frpToken,
+            customDomains: frpCustomDomains.trim(),
+            remotePort: frpRemotePort ? Number(frpRemotePort) : undefined,
+            frpcPath: frpFrpcPath.trim() || undefined,
+          }
+        : undefined;
     try {
-      setStatus(await call(POCKET_ENDPOINTS.tunnelStart, {}));
+      setStatus(await call(POCKET_ENDPOINTS.tunnelStart, { mode, config }));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -144,6 +176,27 @@ function PocketSettingsTab({ rpcCall }) {
   const stopTunnel = async () => {
     try { setStatus(await call(POCKET_ENDPOINTS.tunnelStop, {})); } catch { /* 忽略 */ }
   };
+
+  // 状态轮询回来时：同步模式与已保存配置（只在用户未手动改动时预填）
+  useEffect(() => {
+    if (!status) return;
+    if (!modeTouched && status.tunnelMode) setMode(status.tunnelMode);
+    if (status.namedConfig) {
+      const c = status.namedConfig;
+      if (c.tunnelName) setNamedTunnelName(c.tunnelName);
+      if (c.credsDir) setNamedCredsDir(c.credsDir);
+      if (c.url) setNamedUrl(c.url);
+    }
+    if (status.frpConfig) {
+      const c = status.frpConfig;
+      if (c.serverAddr) setFrpServerAddr(c.serverAddr);
+      if (c.serverPort) setFrpServerPort(String(c.serverPort));
+      if (c.customDomains) setFrpCustomDomains(c.customDomains);
+      if (c.remotePort) setFrpRemotePort(String(c.remotePort));
+      if (c.frpcPath) setFrpFrpcPath(c.frpcPath);
+      // token 被掩码为 ***，不回填；用户重填或留空（留空表示沿用已保存的）
+    }
+  }, [status]);
 
   const lanUrl = status?.lanUrl;
   const tunnelUrl = status?.tunnelUrl;
@@ -190,7 +243,7 @@ function PocketSettingsTab({ rpcCall }) {
         updateInfo.result === 'ok'
           ? (updateInfo.autoRestart ? '✅ 已更新，正在自动重启生效，请稍候刷新 | updated — restarting automatically, refresh shortly'
             : '✅ 已更新，重启 dsh web 生效 | updated — restart dsh web')
-        : updateInfo.result === 'fail' ? `❌ 失败：${updateInfo.output || '未知'}（手动更新：dsh plugin --profile web update wdx-pocket --latest -w）`
+        : updateInfo.result === 'fail' ? `❌ 失败：${updateInfo.output || '未知'}（手动更新：dsh plugin --profile web update dsh-wdx-pocket --latest -w）`
         : `当前 v${updateInfo.current} → 最新 v${updateInfo.latest}`),
     ) : null,
 
@@ -206,19 +259,60 @@ function PocketSettingsTab({ rpcCall }) {
         : h('div', { style: styles.muted }, '代理未就绪… | proxy starting…'),
     ),
 
-    // 公网
+    // 公网（三模式：快速隧道 / 命名隧道 / frp，设置页可切换）
     h('div', { style: styles.block },
       h('div', { style: { fontWeight: 600, fontSize: 13 } }, '🌐 公网（人在外面）| Anywhere'),
       tunnelUrl
         ? h('div', null,
           h('img', { src: status.tunnelQr, alt: 'Tunnel QR', style: styles.qr }),
           h('div', { style: styles.code }, tunnelUrl),
-          h('div', { style: styles.muted }, '任何网络扫码即用（URL 每次重启自动换新）'),
-          h('div', { style: styles.warn, marginTop: 4 }, '🔑 链接已泄露？重启 dsh web——URL 立即换新，旧链接作废，无安全风险 | URL leaked? Restart dsh web — the URL rotates and the old one dies'),
+          h('div', { style: styles.muted },
+            `当前方式：${POCKET_TUNNEL_MODE_LABELS[status.tunnelMode ?? 'quick'] ?? status.tunnelMode ?? 'quick'} · `
+            + (status.tunnelMode === 'quick' ? 'URL 每次重启自动换新' : 'URL 固定，请勿公开')),
+          h('div', { style: styles.warn, marginTop: 4 }, '🔑 链接已泄露？快速隧道重启即换新；命名/frp 模式 URL 固定，请保持私密 | URL leaked? Restart to rotate quick-tunnel URLs; named/frp URLs are fixed — keep them private'),
           h('button', { style: styles.btn, onClick: stopTunnel }, '关闭公网 | Stop'),
         )
         : h('div', null,
-          h('button', { style: styles.primary, onClick: startTunnel, disabled: busy || tunnelStarting }, busy ? '开启中…' : '开启公网访问 | Enable anywhere'),
+          // 模式选择
+          h('div', { style: { marginTop: 8 } },
+            h('div', { style: styles.label }, '公网方式 | Tunnel mode'),
+            h('select', {
+              value: mode,
+              onChange: (e) => { setMode(e.target.value); setModeTouched(true); },
+              style: styles.select,
+            }, (status?.tunnelModes ?? POCKET_TUNNEL_MODES).map((m) =>
+              h('option', { key: m, value: m }, POCKET_TUNNEL_MODE_LABELS[m] ?? m))),
+          ),
+          // 命名隧道配置表单（自动探测 ~/.cloudflared 凭据作候选）
+          mode === 'named' ? h('div', { style: { marginTop: 8 } },
+            h('div', { style: styles.label }, '隧道名 | Tunnel name'),
+            h('input', { style: styles.input, value: namedTunnelName, onChange: (e) => setNamedTunnelName(e.target.value), placeholder: 'live-tunnel', list: 'wdx-named-candidates' }),
+            status?.namedCandidates?.length
+              ? h('datalist', { id: 'wdx-named-candidates' }, status.namedCandidates.map((c) => h('option', { key: c.name, value: c.name }, `${c.name}（${c.id.slice(0, 8)}…）`)))
+              : null,
+            h('div', { style: { ...styles.label, marginTop: 8 } }, '凭据目录（默认 ~/.cloudflared）| Credentials dir'),
+            h('input', { style: styles.input, value: namedCredsDir, onChange: (e) => setNamedCredsDir(e.target.value), placeholder: 'C:\\Users\\you\\.cloudflared' }),
+            h('div', { style: { ...styles.label, marginTop: 8 } }, '公网 URL（二维码内容）| Public URL'),
+            h('input', { style: styles.input, value: namedUrl, onChange: (e) => setNamedUrl(e.target.value), placeholder: 'https://live.example.com' }),
+            h('div', { style: styles.muted, marginTop: 6 }, '只读引用你的 cloudflared 凭据，绝不修改原有配置 | reads your cloudflared credentials only, never modifies your configs'),
+          ) : null,
+          // frp 配置表单
+          mode === 'frp' ? h('div', { style: { marginTop: 8 } },
+            h('div', { style: styles.label }, '服务器地址 | Server address'),
+            h('input', { style: styles.input, value: frpServerAddr, onChange: (e) => setFrpServerAddr(e.target.value), placeholder: '123.45.67.89' }),
+            h('div', { style: { ...styles.label, marginTop: 8 } }, '服务器端口 | Server port'),
+            h('input', { style: styles.input, value: frpServerPort, onChange: (e) => setFrpServerPort(e.target.value), placeholder: '7000' }),
+            h('div', { style: { ...styles.label, marginTop: 8 } }, '认证 token | Auth token'),
+            h('input', { style: styles.input, type: 'password', value: frpToken, onChange: (e) => setFrpToken(e.target.value), placeholder: '已保存则留空 | leave blank if saved' }),
+            h('div', { style: { ...styles.label, marginTop: 8 } }, '自定义域名（逗号分隔，可选）| Custom domains'),
+            h('input', { style: styles.input, value: frpCustomDomains, onChange: (e) => setFrpCustomDomains(e.target.value), placeholder: 'm.example.com' }),
+            h('div', { style: { ...styles.label, marginTop: 8 } }, '远程端口（可选）| Remote port'),
+            h('input', { style: styles.input, value: frpRemotePort, onChange: (e) => setFrpRemotePort(e.target.value), placeholder: '80 / 443 / 8443' }),
+            h('div', { style: { ...styles.label, marginTop: 8 } }, 'frpc 路径（可选，默认自动下载）| frpc path'),
+            h('input', { style: styles.input, value: frpFrpcPath, onChange: (e) => setFrpFrpcPath(e.target.value), placeholder: 'frpc.exe 绝对路径' }),
+            h('div', { style: styles.muted, marginTop: 6 }, 'frp 需服务器端 frps 已运行；配置写入 $DSH_HOME/dsh-wdx-pocket/，不动你的 frpc 配置 | frps must run on your server; config goes to $DSH_HOME/dsh-wdx-pocket/'),
+          ) : null,
+          h('button', { style: { ...styles.primary, marginTop: 12 }, onClick: startTunnel, disabled: busy || tunnelStarting }, busy ? '开启中…' : '开启公网访问 | Enable anywhere'),
           tunnelStarting
             ? h('div', { style: { marginTop: 8, fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)' } },
               `⏳ ${tunnelStateDetail}（已等待 ${Math.floor((Date.now() - (tunnelStateStarted || Date.now())) / 1000)} 秒）…`)
@@ -227,7 +321,7 @@ function PocketSettingsTab({ rpcCall }) {
                 `❌ 开启失败：${tunnelStateDetail || '未知错误 | failed'}（可重试；若是代理/VPN 问题见 README 排障）`)
               : h('div', null,
                 h('div', { style: styles.warn, marginTop: 8 }, '⚠️ DSH 能执行电脑代码：二维码/URL 就是钥匙，请勿发给别人 | the QR/URL is the key — never share it'),
-                h('div', { style: styles.muted, marginTop: 4 }, '不慎泄露了？重启 dsh web，URL 自动换新、旧链接立即失效 | Leaked it? Restart dsh web — the URL rotates and the old one dies instantly'),
+                h('div', { style: styles.muted, marginTop: 4 }, '快速隧道重启即换新；命名/frp 模式 URL 固定，泄露后请尽快处理 | Quick URLs rotate on restart; named/frp URLs are fixed — act fast if leaked'),
               ),
         ),
     ),

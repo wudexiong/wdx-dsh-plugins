@@ -1,4 +1,4 @@
-// wdx-pocket 核心：Host/Origin 改写反向代理
+// dsh-wdx-pocket 核心：Host/Origin 改写反向代理
 //
 // 为什么需要它：DSH 的 /api 浏览器信任栅栏只认 loopback（127.0.0.1）或
 // `--trusted-host` 白名单（且官方禁了 0.0.0.0 绑定，防止把远程执行代码暴露给网络）。
@@ -20,12 +20,12 @@ const DEFAULT_UPSTREAM = { host: '127.0.0.1', port: 3080 };
  * 非安全上下文（http://<LAN-IP>:端口）里浏览器没有 crypto.randomUUID，
  * 前端（DSH 连接层 mint RPC id 用）会直接抛 "crypto.randomUUID is not a function"。
  * 通过代理给 HTML 文档注入 polyfill（只在缺少时生效，用 getRandomValues 实现 v4）。
- * 带 data-wdx-pocket-polyfill 标记：注入判重用它，而不是搜索 "crypto.randomUUID"
+ * 带 data-dsh-wdx-pocket-polyfill 标记：注入判重用它，而不是搜索 "crypto.randomUUID"
  * 字样（dsh 页面源码里可能恰好出现该字符串，导致误判为已注入而跳过）。
  */
-const RANDOM_UUID_POLYFILL = `<script data-wdx-pocket-polyfill="1">!function(){try{if(self.crypto&&!self.crypto.randomUUID){self.crypto.randomUUID=function(){var b=new Uint8Array(16);self.crypto.getRandomValues(b);b[6]=b[6]&15|64;b[8]=b[8]&63|128;var h="";for(var i=0;i<16;i++){var x=b[i].toString(16);h+=(x.length<2?"0":"")+x;if(i===3||i===5||i===7||i===9)h+="-";}return h;}}}catch(e){}}();</script>`;
+const RANDOM_UUID_POLYFILL = `<script data-dsh-wdx-pocket-polyfill="1">!function(){try{if(self.crypto&&!self.crypto.randomUUID){self.crypto.randomUUID=function(){var b=new Uint8Array(16);self.crypto.getRandomValues(b);b[6]=b[6]&15|64;b[8]=b[8]&63|128;var h="";for(var i=0;i<16;i++){var x=b[i].toString(16);h+=(x.length<2?"0":"")+x;if(i===3||i===5||i===7||i===9)h+="-";}return h;}}}catch(e){}}();</script>`;
 
-const INJECT_MARK = 'data-wdx-pocket-polyfill="1"';
+const INJECT_MARK = 'data-dsh-wdx-pocket-polyfill="1"';
 
 /** 上游响应是否压缩过（压缩流不能做文本注入，会损坏页面）。 */
 function isCompressed(headers) {
@@ -45,7 +45,7 @@ function loopbackAuthority(headers, upstream) {
 }
 
 /**
- * 启动 wdx-pocket 代理。
+ * 启动 dsh-wdx-pocket 代理。
  * @param {object} opts
  * @param {number} [opts.port]      监听端口（默认 3081；dsh web 保持 3080）
  * @param {string} [opts.host]      监听地址（默认 0.0.0.0：LAN 与隧道都能到）
@@ -93,7 +93,7 @@ export function createPocketProxy({ port = 3081, host = '0.0.0.0', upstream = DE
     );
     proxyReq.on('error', (err) => {
       if (!res.headersSent) res.writeHead(502, { 'content-type': 'text/plain; charset=utf-8' });
-      res.end(`wdx-pocket: 无法连接上游 dsh web（${upstream.host}:${upstream.port}）——先启动 dsh web | ${err.message}`);
+      res.end(`dsh-wdx-pocket: 无法连接上游 dsh web（${upstream.host}:${upstream.port}）——先启动 dsh web | ${err.message}`);
     });
     req.pipe(proxyReq);
   });

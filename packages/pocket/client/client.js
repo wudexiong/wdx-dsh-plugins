@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: "wdx-pocket",
+  id: "dsh-wdx-pocket",
   factory: (require) => {
     var module = { exports: {} };
     var exports = module.exports;
@@ -28,7 +28,7 @@ var __copyProps = (to, from, except, desc) => {
 };
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// packages/pocket/client/index.jsx
+// wdx-dsh-plugins/packages/pocket/client/index.jsx
 var index_exports = {};
 __export(index_exports, {
   apply: () => apply,
@@ -39,8 +39,8 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 var import_react2 = require("react");
 
-// packages/pocket/client/api.js
-var POCKET_RPC_CHANNEL = "/wdx-pocket";
+// wdx-dsh-plugins/packages/pocket/client/api.js
+var POCKET_RPC_CHANNEL = "/dsh-wdx-pocket";
 var POCKET_ENDPOINTS = Object.freeze({
   status: "pocket.status",
   tunnelStart: "tunnel.start",
@@ -48,6 +48,12 @@ var POCKET_ENDPOINTS = Object.freeze({
   version: "pocket.version",
   update: "pocket.update",
   restart: "pocket.restart"
+});
+var POCKET_TUNNEL_MODES = Object.freeze(["quick", "named", "frp"]);
+var POCKET_TUNNEL_MODE_LABELS = Object.freeze({
+  quick: "\u5FEB\u901F\u96A7\u9053\uFF08\u96F6\u914D\u7F6E\uFF09| Quick",
+  named: "\u547D\u540D\u96A7\u9053\uFF08\u81EA\u6709\u57DF\u540D\uFF09| Named",
+  frp: "frp\uFF08\u81EA\u6709\u670D\u52A1\u5668\uFF09| frp"
 });
 function compareVersions(a, b) {
   const pa = String(a).replace(/^[vV]/, "").split(".");
@@ -88,11 +94,16 @@ function redactStatus(s) {
     tunnelUrl: s?.tunnelUrl ?? null,
     tunnelQr: s?.tunnelQr ?? null,
     tunnelState: s?.tunnelState ?? { phase: "idle" },
+    tunnelMode: s?.tunnelMode ?? null,
+    tunnelModes: s?.tunnelModes ?? [...POCKET_TUNNEL_MODES],
+    namedConfig: s?.namedConfig ?? null,
+    frpConfig: s?.frpConfig ?? null,
+    namedCandidates: s?.namedCandidates ?? [],
     dshPort: s?.dshPort ?? null
   };
 }
 
-// packages/pocket/client/mobile/MobileNavToggle.tsx
+// wdx-dsh-plugins/packages/pocket/client/mobile/MobileNavToggle.tsx
 var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 function MobileNavToggle({ toggleSidebar, t }) {
   const toggleExplorer = () => {
@@ -127,7 +138,7 @@ function MobileNavToggle({ toggleSidebar, t }) {
   ));
 }
 
-// packages/pocket/client/mobile/MobileNavOverlay.tsx
+// wdx-dsh-plugins/packages/pocket/client/mobile/MobileNavOverlay.tsx
 var import_react = require("react");
 var import_dsh_client_ui_primitives2 = require("@deepseek-ai/dsh-client-ui-primitives");
 var MOBILE_QUERY = "(max-width: 1023px)";
@@ -228,7 +239,7 @@ function MobileNavOverlay({ toggleSidebar, t }) {
   ));
 }
 
-// packages/pocket/client/mobile/MobileDrawerFooter.tsx
+// wdx-dsh-plugins/packages/pocket/client/mobile/MobileDrawerFooter.tsx
 var import_dsh_client_ui_primitives3 = require("@deepseek-ai/dsh-client-ui-primitives");
 function MobileDrawerFooter({ useSessions, downloadSessionLog, toggleSidebar, t }) {
   const sessionId = useSessions((state) => state.current);
@@ -264,7 +275,7 @@ function MobileDrawerFooter({ useSessions, downloadSessionLog, toggleSidebar, t 
   ));
 }
 
-// packages/pocket/client/mobile/mobile.css.ts
+// wdx-dsh-plugins/packages/pocket/client/mobile/mobile.css.ts
 var MOBILE_CSS = `
 /* ---------- base control styles (rendered at any width, hidden where unused) ---------- */
 
@@ -1083,7 +1094,7 @@ var MOBILE_CSS = `
 }
 `;
 
-// packages/pocket/client/mobile/locales.ts
+// wdx-dsh-plugins/packages/pocket/client/mobile/locales.ts
 var NS = "mobileNav";
 var zh = {
   "open": "\u6253\u5F00\u76EE\u5F55",
@@ -1100,7 +1111,7 @@ var en = {
   "files": "Files"
 };
 
-// packages/pocket/client/mobile/mobile-apply.tsx
+// wdx-dsh-plugins/packages/pocket/client/mobile/mobile-apply.tsx
 function mobileApply(ctx) {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), "dsh-mobile-nav: dictionaries");
   ctx.effect(() => {
@@ -1278,8 +1289,8 @@ function mobileApply(ctx) {
   }, MobileDrawerFooter));
 }
 
-// packages/pocket/client/index.jsx
-var name = "wdx-pocket";
+// wdx-dsh-plugins/packages/pocket/client/index.jsx
+var name = "dsh-wdx-pocket";
 var inject = ["slots", "connection", "layout", "locale", "sessionLogDownload"];
 var styles = {
   card: { background: "var(--dsw-alias-bg-layer-1,#fff)", border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", borderRadius: 12, padding: "14px 16px", maxWidth: 480 },
@@ -1289,7 +1300,10 @@ var styles = {
   primary: { font: "inherit", cursor: "pointer", border: "none", background: "var(--dsw-alias-brand-primary,#4f6ef7)", color: "#fff", borderRadius: 8, padding: "6px 14px", fontSize: 13 },
   btn: { font: "inherit", cursor: "pointer", border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", background: "var(--dsw-alias-bg-layer-1,#fff)", borderRadius: 8, padding: "6px 14px", fontSize: 13 },
   qr: { width: 220, height: 220, borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", margin: "6px 0" },
-  warn: { color: "var(--dsw-alias-state-warn-primary,#b45309)", fontSize: 12 }
+  warn: { color: "var(--dsw-alias-state-warn-primary,#b45309)", fontSize: 12 },
+  input: { font: "inherit", width: "100%", boxSizing: "border-box", border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", background: "var(--dsw-alias-bg-layer-1,#fff)", color: "inherit", borderRadius: 8, padding: "6px 10px", fontSize: 13, marginTop: 4 },
+  label: { fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)" },
+  select: { font: "inherit", border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", background: "var(--dsw-alias-bg-layer-1,#fff)", color: "inherit", borderRadius: 8, padding: "6px 10px", fontSize: 13, marginTop: 4, width: "100%" }
 };
 function PocketSettingsTab({ rpcCall }) {
   const [status, setStatus] = (0, import_react2.useState)(null);
@@ -1298,6 +1312,17 @@ function PocketSettingsTab({ rpcCall }) {
   const [tunnelState, setTunnelState] = (0, import_react2.useState)(null);
   const [restartNotice, setRestartNotice] = (0, import_react2.useState)(false);
   const [updateInfo, setUpdateInfo] = (0, import_react2.useState)(null);
+  const [mode, setMode] = (0, import_react2.useState)("quick");
+  const [modeTouched, setModeTouched] = (0, import_react2.useState)(false);
+  const [namedTunnelName, setNamedTunnelName] = (0, import_react2.useState)("");
+  const [namedCredsDir, setNamedCredsDir] = (0, import_react2.useState)("");
+  const [namedUrl, setNamedUrl] = (0, import_react2.useState)("");
+  const [frpServerAddr, setFrpServerAddr] = (0, import_react2.useState)("");
+  const [frpServerPort, setFrpServerPort] = (0, import_react2.useState)("7000");
+  const [frpToken, setFrpToken] = (0, import_react2.useState)("");
+  const [frpCustomDomains, setFrpCustomDomains] = (0, import_react2.useState)("");
+  const [frpRemotePort, setFrpRemotePort] = (0, import_react2.useState)("");
+  const [frpFrpcPath, setFrpFrpcPath] = (0, import_react2.useState)("");
   const call = async (endpoint, payload) => {
     const res = await rpcCall(endpoint, payload);
     if (!res?.ok) throw new Error(res?.error?.message ?? "RPC failed");
@@ -1340,7 +1365,7 @@ function PocketSettingsTab({ rpcCall }) {
     (async () => {
       try {
         const v = await call(POCKET_ENDPOINTS.version, {});
-        const meta = await (await fetch("https://registry.npmjs.org/wdx-pocket/latest")).json();
+        const meta = await (await fetch("https://registry.npmjs.org/dsh-wdx-pocket/latest")).json();
         if (!alive) return;
         const latest = typeof meta?.version === "string" ? meta.version : null;
         if (latest && v.current && compareVersions(latest, v.current) > 0) {
@@ -1391,8 +1416,20 @@ function PocketSettingsTab({ rpcCall }) {
     setBusy(true);
     setError(null);
     setTunnelState({ phase: "starting", detail: "\u6B63\u5728\u5F00\u542F\u2026", startedAt: Date.now() });
+    const config = mode === "named" ? {
+      tunnelName: namedTunnelName.trim(),
+      credsDir: namedCredsDir.trim() || void 0,
+      url: namedUrl.trim() || void 0
+    } : mode === "frp" ? {
+      serverAddr: frpServerAddr.trim(),
+      serverPort: Number(frpServerPort) || 7e3,
+      token: frpToken,
+      customDomains: frpCustomDomains.trim(),
+      remotePort: frpRemotePort ? Number(frpRemotePort) : void 0,
+      frpcPath: frpFrpcPath.trim() || void 0
+    } : void 0;
     try {
-      setStatus(await call(POCKET_ENDPOINTS.tunnelStart, {}));
+      setStatus(await call(POCKET_ENDPOINTS.tunnelStart, { mode, config }));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -1405,6 +1442,24 @@ function PocketSettingsTab({ rpcCall }) {
     } catch {
     }
   };
+  (0, import_react2.useEffect)(() => {
+    if (!status) return;
+    if (!modeTouched && status.tunnelMode) setMode(status.tunnelMode);
+    if (status.namedConfig) {
+      const c = status.namedConfig;
+      if (c.tunnelName) setNamedTunnelName(c.tunnelName);
+      if (c.credsDir) setNamedCredsDir(c.credsDir);
+      if (c.url) setNamedUrl(c.url);
+    }
+    if (status.frpConfig) {
+      const c = status.frpConfig;
+      if (c.serverAddr) setFrpServerAddr(c.serverAddr);
+      if (c.serverPort) setFrpServerPort(String(c.serverPort));
+      if (c.customDomains) setFrpCustomDomains(c.customDomains);
+      if (c.remotePort) setFrpRemotePort(String(c.remotePort));
+      if (c.frpcPath) setFrpFrpcPath(c.frpcPath);
+    }
+  }, [status]);
   const lanUrl = status?.lanUrl;
   const tunnelUrl = status?.tunnelUrl;
   const tunnelPhase = tunnelState?.phase ?? "idle";
@@ -1458,7 +1513,7 @@ function PocketSettingsTab({ rpcCall }) {
       (0, import_react2.createElement)(
         "div",
         { style: styles.muted, marginTop: 4 },
-        updateInfo.result === "ok" ? updateInfo.autoRestart ? "\u2705 \u5DF2\u66F4\u65B0\uFF0C\u6B63\u5728\u81EA\u52A8\u91CD\u542F\u751F\u6548\uFF0C\u8BF7\u7A0D\u5019\u5237\u65B0 | updated \u2014 restarting automatically, refresh shortly" : "\u2705 \u5DF2\u66F4\u65B0\uFF0C\u91CD\u542F dsh web \u751F\u6548 | updated \u2014 restart dsh web" : updateInfo.result === "fail" ? `\u274C \u5931\u8D25\uFF1A${updateInfo.output || "\u672A\u77E5"}\uFF08\u624B\u52A8\u66F4\u65B0\uFF1Adsh plugin --profile web update wdx-pocket --latest -w\uFF09` : `\u5F53\u524D v${updateInfo.current} \u2192 \u6700\u65B0 v${updateInfo.latest}`
+        updateInfo.result === "ok" ? updateInfo.autoRestart ? "\u2705 \u5DF2\u66F4\u65B0\uFF0C\u6B63\u5728\u81EA\u52A8\u91CD\u542F\u751F\u6548\uFF0C\u8BF7\u7A0D\u5019\u5237\u65B0 | updated \u2014 restarting automatically, refresh shortly" : "\u2705 \u5DF2\u66F4\u65B0\uFF0C\u91CD\u542F dsh web \u751F\u6548 | updated \u2014 restart dsh web" : updateInfo.result === "fail" ? `\u274C \u5931\u8D25\uFF1A${updateInfo.output || "\u672A\u77E5"}\uFF08\u624B\u52A8\u66F4\u65B0\uFF1Adsh plugin --profile web update dsh-wdx-pocket --latest -w\uFF09` : `\u5F53\u524D v${updateInfo.current} \u2192 \u6700\u65B0 v${updateInfo.latest}`
       )
     ) : null,
     // 局域网
@@ -1474,7 +1529,7 @@ function PocketSettingsTab({ rpcCall }) {
         (0, import_react2.createElement)("div", { style: styles.muted }, "\u624B\u673A\u8FDE\u63A5\u540C\u4E00 WiFi \u540E\u626B\u7801\u5373\u53EF\u6253\u5F00")
       ) : (0, import_react2.createElement)("div", { style: styles.muted }, "\u4EE3\u7406\u672A\u5C31\u7EEA\u2026 | proxy starting\u2026")
     ),
-    // 公网
+    // 公网（三模式：快速隧道 / 命名隧道 / frp，设置页可切换）
     (0, import_react2.createElement)(
       "div",
       { style: styles.block },
@@ -1484,13 +1539,62 @@ function PocketSettingsTab({ rpcCall }) {
         null,
         (0, import_react2.createElement)("img", { src: status.tunnelQr, alt: "Tunnel QR", style: styles.qr }),
         (0, import_react2.createElement)("div", { style: styles.code }, tunnelUrl),
-        (0, import_react2.createElement)("div", { style: styles.muted }, "\u4EFB\u4F55\u7F51\u7EDC\u626B\u7801\u5373\u7528\uFF08URL \u6BCF\u6B21\u91CD\u542F\u81EA\u52A8\u6362\u65B0\uFF09"),
-        (0, import_react2.createElement)("div", { style: styles.warn, marginTop: 4 }, "\u{1F511} \u94FE\u63A5\u5DF2\u6CC4\u9732\uFF1F\u91CD\u542F dsh web\u2014\u2014URL \u7ACB\u5373\u6362\u65B0\uFF0C\u65E7\u94FE\u63A5\u4F5C\u5E9F\uFF0C\u65E0\u5B89\u5168\u98CE\u9669 | URL leaked? Restart dsh web \u2014 the URL rotates and the old one dies"),
+        (0, import_react2.createElement)(
+          "div",
+          { style: styles.muted },
+          `\u5F53\u524D\u65B9\u5F0F\uFF1A${POCKET_TUNNEL_MODE_LABELS[status.tunnelMode ?? "quick"] ?? status.tunnelMode ?? "quick"} \xB7 ` + (status.tunnelMode === "quick" ? "URL \u6BCF\u6B21\u91CD\u542F\u81EA\u52A8\u6362\u65B0" : "URL \u56FA\u5B9A\uFF0C\u8BF7\u52FF\u516C\u5F00")
+        ),
+        (0, import_react2.createElement)("div", { style: styles.warn, marginTop: 4 }, "\u{1F511} \u94FE\u63A5\u5DF2\u6CC4\u9732\uFF1F\u5FEB\u901F\u96A7\u9053\u91CD\u542F\u5373\u6362\u65B0\uFF1B\u547D\u540D/frp \u6A21\u5F0F URL \u56FA\u5B9A\uFF0C\u8BF7\u4FDD\u6301\u79C1\u5BC6 | URL leaked? Restart to rotate quick-tunnel URLs; named/frp URLs are fixed \u2014 keep them private"),
         (0, import_react2.createElement)("button", { style: styles.btn, onClick: stopTunnel }, "\u5173\u95ED\u516C\u7F51 | Stop")
       ) : (0, import_react2.createElement)(
         "div",
         null,
-        (0, import_react2.createElement)("button", { style: styles.primary, onClick: startTunnel, disabled: busy || tunnelStarting }, busy ? "\u5F00\u542F\u4E2D\u2026" : "\u5F00\u542F\u516C\u7F51\u8BBF\u95EE | Enable anywhere"),
+        // 模式选择
+        (0, import_react2.createElement)(
+          "div",
+          { style: { marginTop: 8 } },
+          (0, import_react2.createElement)("div", { style: styles.label }, "\u516C\u7F51\u65B9\u5F0F | Tunnel mode"),
+          (0, import_react2.createElement)("select", {
+            value: mode,
+            onChange: (e) => {
+              setMode(e.target.value);
+              setModeTouched(true);
+            },
+            style: styles.select
+          }, (status?.tunnelModes ?? POCKET_TUNNEL_MODES).map((m) => (0, import_react2.createElement)("option", { key: m, value: m }, POCKET_TUNNEL_MODE_LABELS[m] ?? m)))
+        ),
+        // 命名隧道配置表单（自动探测 ~/.cloudflared 凭据作候选）
+        mode === "named" ? (0, import_react2.createElement)(
+          "div",
+          { style: { marginTop: 8 } },
+          (0, import_react2.createElement)("div", { style: styles.label }, "\u96A7\u9053\u540D | Tunnel name"),
+          (0, import_react2.createElement)("input", { style: styles.input, value: namedTunnelName, onChange: (e) => setNamedTunnelName(e.target.value), placeholder: "live-tunnel", list: "wdx-named-candidates" }),
+          status?.namedCandidates?.length ? (0, import_react2.createElement)("datalist", { id: "wdx-named-candidates" }, status.namedCandidates.map((c) => (0, import_react2.createElement)("option", { key: c.name, value: c.name }, `${c.name}\uFF08${c.id.slice(0, 8)}\u2026\uFF09`))) : null,
+          (0, import_react2.createElement)("div", { style: { ...styles.label, marginTop: 8 } }, "\u51ED\u636E\u76EE\u5F55\uFF08\u9ED8\u8BA4 ~/.cloudflared\uFF09| Credentials dir"),
+          (0, import_react2.createElement)("input", { style: styles.input, value: namedCredsDir, onChange: (e) => setNamedCredsDir(e.target.value), placeholder: "C:\\Users\\you\\.cloudflared" }),
+          (0, import_react2.createElement)("div", { style: { ...styles.label, marginTop: 8 } }, "\u516C\u7F51 URL\uFF08\u4E8C\u7EF4\u7801\u5185\u5BB9\uFF09| Public URL"),
+          (0, import_react2.createElement)("input", { style: styles.input, value: namedUrl, onChange: (e) => setNamedUrl(e.target.value), placeholder: "https://live.example.com" }),
+          (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 6 }, "\u53EA\u8BFB\u5F15\u7528\u4F60\u7684 cloudflared \u51ED\u636E\uFF0C\u7EDD\u4E0D\u4FEE\u6539\u539F\u6709\u914D\u7F6E | reads your cloudflared credentials only, never modifies your configs")
+        ) : null,
+        // frp 配置表单
+        mode === "frp" ? (0, import_react2.createElement)(
+          "div",
+          { style: { marginTop: 8 } },
+          (0, import_react2.createElement)("div", { style: styles.label }, "\u670D\u52A1\u5668\u5730\u5740 | Server address"),
+          (0, import_react2.createElement)("input", { style: styles.input, value: frpServerAddr, onChange: (e) => setFrpServerAddr(e.target.value), placeholder: "123.45.67.89" }),
+          (0, import_react2.createElement)("div", { style: { ...styles.label, marginTop: 8 } }, "\u670D\u52A1\u5668\u7AEF\u53E3 | Server port"),
+          (0, import_react2.createElement)("input", { style: styles.input, value: frpServerPort, onChange: (e) => setFrpServerPort(e.target.value), placeholder: "7000" }),
+          (0, import_react2.createElement)("div", { style: { ...styles.label, marginTop: 8 } }, "\u8BA4\u8BC1 token | Auth token"),
+          (0, import_react2.createElement)("input", { style: styles.input, type: "password", value: frpToken, onChange: (e) => setFrpToken(e.target.value), placeholder: "\u5DF2\u4FDD\u5B58\u5219\u7559\u7A7A | leave blank if saved" }),
+          (0, import_react2.createElement)("div", { style: { ...styles.label, marginTop: 8 } }, "\u81EA\u5B9A\u4E49\u57DF\u540D\uFF08\u9017\u53F7\u5206\u9694\uFF0C\u53EF\u9009\uFF09| Custom domains"),
+          (0, import_react2.createElement)("input", { style: styles.input, value: frpCustomDomains, onChange: (e) => setFrpCustomDomains(e.target.value), placeholder: "m.example.com" }),
+          (0, import_react2.createElement)("div", { style: { ...styles.label, marginTop: 8 } }, "\u8FDC\u7A0B\u7AEF\u53E3\uFF08\u53EF\u9009\uFF09| Remote port"),
+          (0, import_react2.createElement)("input", { style: styles.input, value: frpRemotePort, onChange: (e) => setFrpRemotePort(e.target.value), placeholder: "80 / 443 / 8443" }),
+          (0, import_react2.createElement)("div", { style: { ...styles.label, marginTop: 8 } }, "frpc \u8DEF\u5F84\uFF08\u53EF\u9009\uFF0C\u9ED8\u8BA4\u81EA\u52A8\u4E0B\u8F7D\uFF09| frpc path"),
+          (0, import_react2.createElement)("input", { style: styles.input, value: frpFrpcPath, onChange: (e) => setFrpFrpcPath(e.target.value), placeholder: "frpc.exe \u7EDD\u5BF9\u8DEF\u5F84" }),
+          (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 6 }, "frp \u9700\u670D\u52A1\u5668\u7AEF frps \u5DF2\u8FD0\u884C\uFF1B\u914D\u7F6E\u5199\u5165 $DSH_HOME/dsh-wdx-pocket/\uFF0C\u4E0D\u52A8\u4F60\u7684 frpc \u914D\u7F6E | frps must run on your server; config goes to $DSH_HOME/dsh-wdx-pocket/")
+        ) : null,
+        (0, import_react2.createElement)("button", { style: { ...styles.primary, marginTop: 12 }, onClick: startTunnel, disabled: busy || tunnelStarting }, busy ? "\u5F00\u542F\u4E2D\u2026" : "\u5F00\u542F\u516C\u7F51\u8BBF\u95EE | Enable anywhere"),
         tunnelStarting ? (0, import_react2.createElement)(
           "div",
           { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)" } },
@@ -1503,7 +1607,7 @@ function PocketSettingsTab({ rpcCall }) {
           "div",
           null,
           (0, import_react2.createElement)("div", { style: styles.warn, marginTop: 8 }, "\u26A0\uFE0F DSH \u80FD\u6267\u884C\u7535\u8111\u4EE3\u7801\uFF1A\u4E8C\u7EF4\u7801/URL \u5C31\u662F\u94A5\u5319\uFF0C\u8BF7\u52FF\u53D1\u7ED9\u522B\u4EBA | the QR/URL is the key \u2014 never share it"),
-          (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 4 }, "\u4E0D\u614E\u6CC4\u9732\u4E86\uFF1F\u91CD\u542F dsh web\uFF0CURL \u81EA\u52A8\u6362\u65B0\u3001\u65E7\u94FE\u63A5\u7ACB\u5373\u5931\u6548 | Leaked it? Restart dsh web \u2014 the URL rotates and the old one dies instantly")
+          (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 4 }, "\u5FEB\u901F\u96A7\u9053\u91CD\u542F\u5373\u6362\u65B0\uFF1B\u547D\u540D/frp \u6A21\u5F0F URL \u56FA\u5B9A\uFF0C\u6CC4\u9732\u540E\u8BF7\u5C3D\u5FEB\u5904\u7406 | Quick URLs rotate on restart; named/frp URLs are fixed \u2014 act fast if leaked")
         )
       )
     ),

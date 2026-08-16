@@ -7,15 +7,15 @@ Wdx 的 **DeepSeek Harness 插件生态**（monorepo，pnpm workspace）：一�
 
 | 包 | 定位 | 状态 |
 |---|---|---|
-| [`packages/pocket`](packages/pocket/README.md) → **`wdx-pocket`** | 把 DSH 装进口袋：手机扫码访问电脑上的 DeepSeek Harness（局域网 + 公网，实时同屏，移动端适配） | 开发中 |
+| [`packages/pocket`](packages/pocket/README.md) → **`dsh-wdx-pocket`** | 把 DSH 装进口袋：手机扫码访问电脑上的 DeepSeek Harness（局域网 + 公网，实时同屏，移动端适配） | 开发中 |
 
 ## 安装
 
 ```sh
-dsh plugin --profile web add wdx-pocket -w
+dsh plugin --profile web add dsh-wdx-pocket -w
 ```
 
-（`wdx-pocket` 发布到 npm 后可用；当前开发期用本地路径：`dsh plugin --profile web add <本仓库>/packages/pocket -w`）
+（`dsh-wdx-pocket` 发布到 npm 后可用；当前开发期用本地路径：`dsh plugin --profile web add <本仓库>/packages/pocket -w`）
 
 ## 开发
 

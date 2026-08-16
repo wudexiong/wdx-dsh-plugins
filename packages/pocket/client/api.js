@@ -1,5 +1,5 @@
-// wdx-pocket 设置页签 RPC 契约（client 与 host 共享）
-export const POCKET_RPC_CHANNEL = '/wdx-pocket';
+// dsh-wdx-pocket 设置页签 RPC 契约（client 与 host 共享）
+export const POCKET_RPC_CHANNEL = '/dsh-wdx-pocket';
 
 export const POCKET_ENDPOINTS = Object.freeze({
   status: 'pocket.status',
@@ -8,6 +8,16 @@ export const POCKET_ENDPOINTS = Object.freeze({
   version: 'pocket.version',
   update: 'pocket.update',
   restart: 'pocket.restart',
+});
+
+/** 公网隧道模式（顺序即设置页展示顺序，与 host TUNNEL_MODES 一致）。 */
+export const POCKET_TUNNEL_MODES = Object.freeze(['quick', 'named', 'frp']);
+
+/** 模式展示标签（设置页选择器用）。 */
+export const POCKET_TUNNEL_MODE_LABELS = Object.freeze({
+  quick: '快速隧道（零配置）| Quick',
+  named: '命名隧道（自有域名）| Named',
+  frp: 'frp（自有服务器）| frp',
 });
 
 /** 语义化版本比较：a > b 返回正数，相等 0，a < b 负数（数字段 + 预发布后缀）。 */
@@ -55,6 +65,11 @@ export function redactStatus(s) {
     tunnelUrl: s?.tunnelUrl ?? null,
     tunnelQr: s?.tunnelQr ?? null,
     tunnelState: s?.tunnelState ?? { phase: 'idle' },
+    tunnelMode: s?.tunnelMode ?? null,
+    tunnelModes: s?.tunnelModes ?? [...POCKET_TUNNEL_MODES],
+    namedConfig: s?.namedConfig ?? null,
+    frpConfig: s?.frpConfig ?? null,
+    namedCandidates: s?.namedCandidates ?? [],
     dshPort: s?.dshPort ?? null,
   };
 }

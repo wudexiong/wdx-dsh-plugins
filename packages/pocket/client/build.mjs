@@ -1,4 +1,4 @@
-// wdx-pocket 网页客户端打包：client/index.jsx → client/client.js
+// dsh-wdx-pocket 网页客户端打包：client/index.jsx → client/client.js
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,7 +7,7 @@ import { build } from 'esbuild';
 const sourceDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(sourceDir, '..');
 const outputPath = resolve(packageRoot, 'client/client.js');
-const loaderId = process.env.DSH_POCKET_CLIENT_ID ?? 'wdx-pocket';
+const loaderId = process.env.DSH_POCKET_CLIENT_ID ?? 'dsh-wdx-pocket';
 
 const result = await build({
   entryPoints: [resolve(sourceDir, 'index.jsx')],

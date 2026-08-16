@@ -28,7 +28,7 @@
 **前提**：已装 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（`dsh --version` 可用）。
 
 ```sh
-# 1. 装插件（发布到 npm 后：dsh plugin --profile web add wdx-pocket -w）
+# 1. 装插件（发布到 npm 后：dsh plugin --profile web add dsh-wdx-pocket -w）
 dsh plugin --profile web add <本仓库>/packages/pocket -w
 
 # 2. 重启 dsh web

@@ -4,7 +4,7 @@
 // 无密码模式：URL 即钥匙（dsh web 能执行代码，请勿把二维码/URL 发给别人）。
 
 import { spawn, execSync } from 'node:child_process';
-import { mkdir, access, chmod, rm, stat } from 'node:fs/promises';
+import { mkdir, access, chmod, rm, stat, readdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { pipeline } from 'node:stream/promises';
@@ -101,13 +101,13 @@ let downloading = null;
 
 /**
  * 拿一个可用的 cloudflared 路径。
- * 优先：PATH 已有 → 直接用；否则用持久缓存（$DSH_HOME/wdx-pocket/cloudflared），
+ * 优先：PATH 已有 → 直接用；否则用持久缓存（$DSH_HOME/dsh-wdx-pocket/cloudflared），
  * 只有缓存缺失才下载——避免每次开启公网都重新下 20MB。
  */
 export async function resolveCloudflared({ home, onPhase = () => {}, signal } = {}) {
   if (cloudflaredOnPath()) return 'cloudflared';
   const dshHome = home ?? process.env.DSH_HOME ?? join(homedir(), '.dsh');
-  const cacheDir = join(dshHome, 'wdx-pocket', 'bin');
+  const cacheDir = join(dshHome, 'dsh-wdx-pocket', 'bin');
   const bin = join(cacheDir, `cloudflared${platformBinary().ext}`);
   try {
     await access(bin);
@@ -143,7 +143,7 @@ export async function startQuickTunnel({ port, home, signal, onPhase = () => {} 
   child.on('error', (err) => {
     cleanup?.();
     onPhase?.('error');
-    rejectErr?.(new Error(`cloudflared 启动失败：${err?.message ?? err}（可删除 $DSH_HOME/wdx-pocket/bin 缓存后重试）`));
+    rejectErr?.(new Error(`cloudflared 启动失败：${err?.message ?? err}（可删除 $DSH_HOME/dsh-wdx-pocket/bin 缓存后重试）`));
   });
   onPhase('registering');
 
@@ -211,5 +211,374 @@ export async function startQuickTunnel({ port, home, signal, onPhase = () => {} 
       exitListeners.add(cb);
       return () => exitListeners.delete(cb);
     },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 多模式公网隧道（dsh-wdx-pocket v0.2+）
+//
+// 三种模式，设置页可切换：
+//   quick —— cloudflared 快速隧道（trycloudflare，零配置，URL 每次换新）
+//   named —— cloudflared 命名隧道（自己的域名走 Cloudflare，URL 固定）
+//   frp   —— frp 内网穿透（自有公网服务器 + 自己的域名，国内访问最稳）
+//
+// 设计约束（面向所有用户）：
+//   - 绝不修改用户已有配置（~/.cloudflared/config.yml 等）：named 模式写
+//     dsh-pocket 自己的临时配置，只读引用用户凭据；frp 写自己的 toml。
+//   - 所有临时文件/缓存写 $DSH_HOME/dsh-wdx-pocket/，绝不写安装目录。
+// ---------------------------------------------------------------------------
+
+const NAMED_TUNNEL_READY_RE = /Registered tunnel connection|Connection registered/i;
+const FRP_READY_RE = /login to server success|start proxy success/i;
+
+/** 通用隧道进程 runner：spawn → 等待就绪特征输出 → 返回 {kill, onExit}。 */
+function spawnTunnelProcess({ bin, args, cwd, readyRe, timeoutMs = 30_000, onPhase = () => {}, signal }) {
+  const child = spawn(bin, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+  let cleanup = null;
+  let rejectErr = null;
+  child.on('error', (err) => {
+    cleanup?.();
+    onPhase?.('error');
+    rejectErr?.(new Error(`隧道进程启动失败：${err?.message ?? err}`));
+  });
+  onPhase('registering');
+
+  const ready = new Promise((resolve, reject) => {
+    let buf = '';
+    const onData = (chunk) => {
+      buf += String(chunk);
+      if (buf.length > 65_536) buf = buf.slice(-32_768);
+      if (readyRe.test(buf)) {
+        cleanup();
+        onPhase('ready');
+        resolve();
+      }
+    };
+    const onExit = (code) => {
+      cleanup();
+      reject(new Error(`隧道进程退出（code=${code}）| tunnel process exited`));
+    };
+    cleanup = () => {
+      child.stdout.off('data', onData);
+      child.stderr.off('data', onData);
+      child.off('exit', onExit);
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      child.stdout.resume();
+      child.stderr.resume();
+    };
+    const onAbort = () => {
+      cleanup();
+      try { child.kill(); } catch { /* 忽略 */ }
+      reject(new Error('已取消 | cancelled'));
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      try { child.kill(); } catch { /* 忽略 */ }
+      reject(new Error(`隧道启动超时（${Math.round(timeoutMs / 1000)}s）——请检查网络/代理后重试 | tunnel start timeout`));
+    }, timeoutMs);
+
+    child.stdout.on('data', onData);
+    child.stderr.on('data', onData);
+    child.once('exit', onExit);
+    signal?.addEventListener('abort', onAbort, { once: true });
+    rejectErr = reject;
+  });
+
+  const exitListeners = new Set();
+  child.on('exit', (code) => {
+    for (const cb of exitListeners) cb(code);
+  });
+
+  return {
+    ready,
+    kill: () => {
+      try { child.kill(); } catch { /* 忽略 */ }
+    },
+    onExit: (cb) => {
+      exitListeners.add(cb);
+      return () => exitListeners.delete(cb);
+    },
+  };
+}
+
+/** dsh-pocket 私有运行时目录（$DSH_HOME/dsh-wdx-pocket/）。 */
+export function pocketDir(home) {
+  return join(home ?? process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'dsh-wdx-pocket');
+}
+
+/**
+ * 探测 Cloudflare 命名隧道的凭据文件（~/.cloudflared/<id>.json，只读）。
+ * 凭据 JSON 含 TunnelName/TunnelID 字段，据此匹配用户填的隧道名。
+ */
+export async function findCloudflaredCredential(credsDir, tunnelName) {
+  const dir = credsDir || join(homedir(), '.cloudflared');
+  let files = [];
+  try { files = await readdir(dir); } catch { return null; }
+  for (const f of files) {
+    if (!f.endsWith('.json')) continue;
+    try {
+      const data = JSON.parse(await readFile(join(dir, f), 'utf8'));
+      if (data?.TunnelName === tunnelName || data?.TunnelID === tunnelName) {
+        return join(dir, f);
+      }
+    } catch { /* 坏 JSON 跳过 */ }
+  }
+  return null;
+}
+
+/** 列出本机可用的命名隧道候选（设置页下拉用）。 */
+export async function listNamedTunnelCandidates(credsDir) {
+  const dir = credsDir || join(homedir(), '.cloudflared');
+  let files = [];
+  try { files = await readdir(dir); } catch { return []; }
+  const out = [];
+  for (const f of files) {
+    if (!f.endsWith('.json')) continue;
+    try {
+      const data = JSON.parse(await readFile(join(dir, f), 'utf8'));
+      if (data?.TunnelName && data?.TunnelID) out.push({ name: data.TunnelName, id: data.TunnelID });
+    } catch { /* 跳过 */ }
+  }
+  return out;
+}
+
+/**
+ * 启动 cloudflared 命名隧道（自己的域名走 Cloudflare）。
+ * 关键：不改用户的 ~/.cloudflared/config.yml —— 写一份 dsh-pocket 自己的
+ * 临时配置（ingress 指向本机代理端口），只读引用用户凭据文件。
+ *
+ * @param {object} opts
+ * @param {number} opts.port        本机代理端口
+ * @param {string} opts.tunnelName  隧道名（如 live-tunnel）
+ * @param {string} [opts.credsDir]  凭据目录（默认 ~/.cloudflared）
+ * @param {string} [opts.url]       公网 URL（如 https://live.example.com）
+ * @returns {Promise<{url:string, kill:()=>void, onExit:Function}>}
+ */
+export async function startNamedTunnel({ port, tunnelName, credsDir, url, home, signal, onPhase = () => {} }) {
+  if (!tunnelName) {
+    throw new Error('请填写命名隧道名称（如 live-tunnel）。没有命名隧道？先创建：cloudflared tunnel create <名称>，再绑定域名：cloudflared tunnel route dns <名称> <你的域名> | tunnel name required');
+  }
+  const bin = await resolveCloudflared({ home, onPhase, signal });
+  const credFile = await findCloudflaredCredential(credsDir, tunnelName);
+  if (!credFile) {
+    throw new Error(
+      `未在 ${credsDir || join(homedir(), '.cloudflared')} 找到隧道「${tunnelName}」的凭据。`
+      + '请确认隧道名正确，或设置页填写正确的凭据目录 | credential not found for tunnel "' + tunnelName + '"',
+    );
+  }
+  onPhase('starting');
+  const dir = pocketDir(home);
+  await mkdir(dir, { recursive: true });
+  const cfgPath = join(dir, `tunnel-${tunnelName.replace(/[^a-zA-Z0-9_-]/g, '_')}.yml`);
+  // 单条无 hostname 的 ingress = catch-all：本隧道所有域名请求都转发到本机代理
+  await writeFile(
+    cfgPath,
+    `tunnel: ${tunnelName}\ncredentials-file: ${credFile}\ningress:\n  - service: http://127.0.0.1:${port}\n`,
+    'utf8',
+  );
+  const proc = spawnTunnelProcess({
+    bin,
+    args: ['tunnel', 'run', '--config', cfgPath, '--no-autoupdate', tunnelName],
+    cwd: dir,
+    readyRe: NAMED_TUNNEL_READY_RE,
+    onPhase,
+    signal,
+  });
+  await proc.ready;
+  return {
+    url: url || `https://${tunnelName}`,
+    kill: proc.kill,
+    onExit: proc.onExit,
+  };
+}
+
+/** frp 镜像下载源（GitHub releases 直连 + 国内加速镜像）。 */
+const FRP_MIRRORS = [
+  (asset) => `https://github.com/fatedier/frp/releases/download/${asset}`,
+  (asset) => `https://ghfast.top/https://github.com/fatedier/frp/releases/download/${asset}`,
+  (asset) => `https://gh-proxy.com/https://github.com/fatedier/frp/releases/download/${asset}`,
+  (asset) => `https://mirror.ghproxy.com/https://github.com/fatedier/frp/releases/download/${asset}`,
+];
+
+/** 递归在目录树里找文件名匹配的文件（frp zip 内二进制在子目录里）。 */
+async function findFileRecursive(dir, matcher) {
+  let entries = [];
+  try { entries = await readdir(dir, { withFileTypes: true }); } catch { return null; }
+  for (const e of entries) {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) {
+      const found = await findFileRecursive(p, matcher);
+      if (found) return found;
+    } else if (matcher(e.name)) {
+      return p;
+    }
+  }
+  return null;
+}
+
+/** 下载并解压 frpc（尽力而为；失败时引导用户手动安装）。 */
+async function downloadFrp(binPath, signal) {
+  const { os, a, ext } = platformBinary();
+  const dir = dirname(binPath);
+  // 先试 GitHub API 拿最新版本号；失败用写死的稳定版本兜底
+  let ver = '0.61.1';
+  try {
+    const res = await fetch('https://api.github.com/repos/fatedier/frp/releases/latest', {
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (res.ok) {
+      const j = await res.json();
+      if (typeof j?.tag_name === 'string') ver = j.tag_name.replace(/^v/, '');
+    }
+  } catch { /* 网络失败用兜底版本 */ }
+  const asset = `frp_${ver}_${os}_${a}.zip`;
+  const zip = join(dir, asset);
+  const fetchSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(90_000)]) : AbortSignal.timeout(90_000);
+
+  let lastErr = null;
+  for (let i = 0; i < FRP_MIRRORS.length; i++) {
+    const url = FRP_MIRRORS[i](asset);
+    console.log(`⬇️  下载 frpc（${i + 1}/${FRP_MIRRORS.length}：${hostOf(url)}）…`);
+    try {
+      const res = await fetch(url, { signal: fetchSignal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await pipeline(Readable.fromWeb(res.body), createWriteStream(zip));
+      const st = await stat(zip);
+      if (st.size < 1024 * 1024) throw new Error(`文件异常小（${st.size} 字节），疑似镜像错误页`);
+      lastErr = null;
+      break;
+    } catch (err) {
+      lastErr = err;
+      await rm(zip, { force: true }).catch(() => {});
+      console.warn(`  ⚠️ 源 ${i + 1} 失败：${err?.message ?? err}，尝试下一个…`);
+    }
+  }
+  if (lastErr) {
+    throw new Error(
+      `frpc 下载失败：所有镜像源都不通（最后错误：${lastErr?.message ?? lastErr}）。`
+      + '可手动安装：下载 frp 解压后把 frpc 放到 $DSH_HOME/dsh-wdx-pocket/bin/，或在设置页填 frpc 路径 | '
+      + 'frpc download failed — install frpc manually and set its path in settings',
+    );
+  }
+
+  // 解压 zip：Windows 自带 tar（bsdtar）支持 zip；其它平台优先 unzip
+  const extractDir = join(dir, 'frp-extract');
+  await mkdir(extractDir, { recursive: true });
+  try {
+    if (os === 'windows') {
+      await new Promise((resolve, reject) => {
+        const child = spawn('tar', ['-xf', zip, '-C', extractDir], { stdio: 'ignore' });
+        child.once('exit', (code) => code === 0 ? resolve() : reject(new Error(`解压失败（code=${code}）`)));
+        child.once('error', reject);
+      });
+    } else {
+      execSync(`unzip -o -q "${zip}" -d "${extractDir}"`, { stdio: 'ignore' });
+    }
+    const found = await findFileRecursive(extractDir, (name) => name === `frpc${ext}`);
+    if (!found) throw new Error('解压后未找到 frpc 二进制');
+    await rm(binPath, { force: true }).catch(() => {});
+    await import('node:fs/promises').then(({ copyFile }) => copyFile(found, binPath));
+    if (os !== 'windows') await chmod(binPath, 0o755);
+  } finally {
+    await rm(extractDir, { recursive: true, force: true }).catch(() => {});
+    await rm(zip, { force: true }).catch(() => {});
+  }
+  return binPath;
+}
+
+/** frpc 是否已在 PATH。 */
+function frpcOnPath() {
+  try {
+    execSync(process.platform === 'win32' ? 'where frpc' : 'command -v frpc', { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 拿一个可用的 frpc：设置页路径 → PATH → 缓存 → 下载。 */
+export async function resolveFrpc({ frpcPath, home, onPhase = () => {}, signal } = {}) {
+  if (frpcPath) {
+    try { await access(frpcPath); return frpcPath; } catch {
+      throw new Error(`设置的 frpc 路径不存在：${frpcPath} | frpc path not found`);
+    }
+  }
+  if (frpcOnPath()) return 'frpc';
+  const bin = join(pocketDir(home), 'bin', `frpc${platformBinary().ext}`);
+  try {
+    await access(bin);
+    return bin;
+  } catch { /* 缓存缺失，下载 */ }
+  onPhase('downloading');
+  await mkdir(dirname(bin), { recursive: true });
+  return downloadFrp(bin, signal);
+}
+
+/** 依据 frp 配置拼一个展示用的公网 URL（用户也可在设置页直接填 url 覆盖）。 */
+function buildFrpUrl(frp) {
+  const domain = (frp.customDomains || '').split(',')[0]?.trim();
+  if (domain) {
+    const proto = frp.protocol === 'https' ? 'https' : 'http';
+    const port = frp.remotePort && Number(frp.remotePort) !== 80 && Number(frp.remotePort) !== 443
+      ? `:${frp.remotePort}` : '';
+    return `${proto}://${domain}${port}`;
+  }
+  if (frp.serverAddr) {
+    const port = frp.remotePort ? `:${frp.remotePort}` : '';
+    return `http://${frp.serverAddr}${port}`;
+  }
+  return null;
+}
+
+/**
+ * 启动 frp 内网穿透（自有公网服务器 + 自己的域名）。
+ * frpc 配置写入 $DSH_HOME/dsh-wdx-pocket/frpc.toml（绝不碰用户的 frpc 配置）。
+ *
+ * @param {object} opts
+ * @param {number} opts.port  本机代理端口
+ * @param {object} opts.frp   { serverAddr, serverPort, token, customDomains, remotePort, protocol, url, frpcPath }
+ */
+export async function startFrpTunnel({ port, frp = {}, home, signal, onPhase = () => {} }) {
+  if (!frp.serverAddr) {
+    throw new Error('请填写 frp 服务器地址（serverAddr）| frp server address required');
+  }
+  const bin = await resolveFrpc({ frpcPath: frp.frpcPath, home, onPhase, signal });
+  onPhase('starting');
+  const dir = pocketDir(home);
+  await mkdir(dir, { recursive: true });
+  const tomlPath = join(dir, 'frpc.toml');
+  const lines = [
+    `serverAddr = ${JSON.stringify(frp.serverAddr)}`,
+    `serverPort = ${Number(frp.serverPort) || 7000}`,
+  ];
+  if (frp.token) lines.push(`auth.token = ${JSON.stringify(frp.token)}`);
+  lines.push('[[proxies]]');
+  lines.push('name = "dsh-wdx-pocket"');
+  lines.push('type = "http"');
+  lines.push('localIP = "127.0.0.1"');
+  lines.push(`localPort = ${port}`);
+  const domains = (frp.customDomains || '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (domains.length) {
+    lines.push(`customDomains = [${domains.map((d) => JSON.stringify(d)).join(', ')}]`);
+  }
+  if (frp.remotePort && Number(frp.remotePort) > 0) {
+    lines.push(`remotePort = ${Number(frp.remotePort)}`);
+  }
+  await writeFile(tomlPath, lines.join('\n'), 'utf8');
+
+  const proc = spawnTunnelProcess({
+    bin,
+    args: ['-c', tomlPath],
+    cwd: dir,
+    readyRe: FRP_READY_RE,
+    onPhase,
+    signal,
+  });
+  await proc.ready;
+  return {
+    url: frp.url || buildFrpUrl(frp) || `http://${frp.serverAddr}`,
+    kill: proc.kill,
+    onExit: proc.onExit,
   };
 }

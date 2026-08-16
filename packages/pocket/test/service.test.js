@@ -1,4 +1,4 @@
-// wdx-pocket 服务 + RPC 测试（stub 隧道/代理，无网络）
+// dsh-wdx-pocket 服务 + RPC 测试（stub 隧道/代理，无网络）
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -197,7 +197,7 @@ test('readRestartNotice：真实文件系统（无文件/坏 JSON/过期/有效�
   const path = await import('node:path');
   const { readRestartNotice } = await import('../lib/index.js');
 
-  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'wdx-pocket-test-'));
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'dsh-wdx-pocket-test-'));
   const prev = process.env.DSH_HOME;
   process.env.DSH_HOME = dir;
   try {
@@ -205,16 +205,16 @@ test('readRestartNotice：真实文件系统（无文件/坏 JSON/过期/有效�
     assert.equal(await readRestartNotice(), null, '无标记文件返回 null');
 
     // 2. 坏 JSON → null
-    await fsp.mkdir(path.join(dir, 'wdx-pocket'), { recursive: true });
-    await fsp.writeFile(path.join(dir, 'wdx-pocket', 'restarted.json'), 'not-json');
+    await fsp.mkdir(path.join(dir, 'dsh-wdx-pocket'), { recursive: true });
+    await fsp.writeFile(path.join(dir, 'dsh-wdx-pocket', 'restarted.json'), 'not-json');
     assert.equal(await readRestartNotice(), null, '坏 JSON 返回 null');
 
     // 3. 过期标记（31 分钟前）→ null
-    await fsp.writeFile(path.join(dir, 'wdx-pocket', 'restarted.json'), JSON.stringify({ at: Date.now() - 31 * 60 * 1000, pid: 1 }));
+    await fsp.writeFile(path.join(dir, 'dsh-wdx-pocket', 'restarted.json'), JSON.stringify({ at: Date.now() - 31 * 60 * 1000, pid: 1 }));
     assert.equal(await readRestartNotice(), null, '过期标记返回 null');
 
     // 4. 有效标记 → 返回内容
-    await fsp.writeFile(path.join(dir, 'wdx-pocket', 'restarted.json'), JSON.stringify({ at: Date.now(), pid: 4242 }));
+    await fsp.writeFile(path.join(dir, 'dsh-wdx-pocket', 'restarted.json'), JSON.stringify({ at: Date.now(), pid: 4242 }));
     const n = await readRestartNotice();
     assert.equal(n.pid, 4242, '有效标记返回 pid');
   } finally {
@@ -229,11 +229,11 @@ test('consumeRestartNotice：读后即删（横幅只显示一次，不会一直
   const path = await import('node:path');
   const { consumeRestartNotice } = await import('../lib/index.js');
 
-  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'wdx-pocket-consume-'));
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'dsh-wdx-pocket-consume-'));
   const prev = process.env.DSH_HOME;
   process.env.DSH_HOME = dir;
   try {
-    const noticePath = path.join(dir, 'wdx-pocket', 'restarted.json');
+    const noticePath = path.join(dir, 'dsh-wdx-pocket', 'restarted.json');
     await fsp.mkdir(path.dirname(noticePath), { recursive: true });
     await fsp.writeFile(noticePath, JSON.stringify({ at: Date.now(), pid: 4242 }));
 

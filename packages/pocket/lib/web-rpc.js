@@ -1,4 +1,4 @@
-// wdx-pocket Web RPC（loopback-only）：设置页 ⇄ Host 的手机访问通道
+// dsh-wdx-pocket Web RPC（loopback-only）：设置页 ⇄ Host 的手机访问通道
 
 import { POCKET_RPC_CHANNEL, POCKET_ENDPOINTS, redactStatus } from '../client/api.js';
 
@@ -24,10 +24,10 @@ export function killHint(port) {
   return `lsof -ti :${port} | xargs kill -9`;
 }
 
-/** 注册 /wdx-pocket 逻辑通道（仅本机 loopback 可调）。 */
+/** 注册 /dsh-wdx-pocket 逻辑通道（仅本机 loopback 可调）。 */
 export function installPocketRpc(ctx, { service, log = console, runUpdate = null, restart = null, restartNotice = null }) {
   if (!ctx?.connection?.rpc?.handle) {
-    log.warn?.('wdx-pocket: DSH Host Connection RPC unavailable — settings tab disabled | 无 Connection RPC，设置页不可用');
+    log.warn?.('dsh-wdx-pocket: DSH Host Connection RPC unavailable — settings tab disabled | 无 Connection RPC，设置页不可用');
     return () => {};
   }
   return ctx.connection.rpc.handle(POCKET_RPC_CHANNEL, async (endpoint, payload = {}, signal) => {
@@ -46,7 +46,8 @@ export function installPocketRpc(ctx, { service, log = console, runUpdate = null
         return await statusPayload();
       }
       if (endpoint === POCKET_ENDPOINTS.tunnelStart) {
-        await service.startTunnel();
+        // payload: { mode?: 'quick'|'named'|'frp', config?: object } —— 透传给 service
+        await service.startTunnel(payload ?? {});
         return await statusPayload();
       }
       if (endpoint === POCKET_ENDPOINTS.tunnelStop) {
@@ -78,7 +79,7 @@ export function installPocketRpc(ctx, { service, log = console, runUpdate = null
       }
       return fail('bad-request', `Unknown endpoint: ${endpoint}`);
     } catch (err) {
-      log.error?.('wdx-pocket: rpc %s failed | RPC 失败: %s', endpoint, err?.message ?? err);
+      log.error?.('dsh-wdx-pocket: rpc %s failed | RPC 失败: %s', endpoint, err?.message ?? err);
       return fail('bad-request', err?.message ?? String(err));
     }
   }, { authority: 'loopback' });

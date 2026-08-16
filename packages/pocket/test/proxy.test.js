@@ -1,4 +1,4 @@
-// wdx-pocket 代理测试（假上游，验证 Host/Origin 改写 + WebSocket 透传）
+// dsh-wdx-pocket 代理测试（假上游，验证 Host/Origin 改写 + WebSocket 透传）
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

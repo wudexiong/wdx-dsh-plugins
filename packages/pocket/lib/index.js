@@ -1,4 +1,4 @@
-// wdx-pocket 插件入口（单包单插件：手机扫码访问 DSH，全在这一个包里）
+// dsh-wdx-pocket 插件入口（单包单插件：手机扫码访问 DSH，全在这一个包里）
 //
 // 设置一级入口「手机访问」：
 //   - 局域网二维码：自动显示（代理随插件启动）
@@ -20,7 +20,7 @@ import { createPocketService } from './service.mjs';
 import { installPocketRpc } from './web-rpc.js';
 import { restartHost } from './restart.js';
 
-const name = 'wdx-pocket';
+const name = 'dsh-wdx-pocket';
 const inject = ['connection', 'webServer'];
 
 const pkgPath = fileURLToPath(new URL('../package.json', import.meta.url));
@@ -40,7 +40,7 @@ function currentVersion() {
 /** 进程启动时加载的版本（模块加载瞬间固化；用于识别「磁盘已更新但进程还是旧代码」）。 */
 const loadedVersion = currentVersion();
 
-const restartNoticeRel = join('wdx-pocket', 'restarted.json');
+const restartNoticeRel = join('dsh-wdx-pocket', 'restarted.json');
 function restartNoticePath() {
   return join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), restartNoticeRel);
 }
@@ -81,10 +81,10 @@ function pocketRestart(service) {
   return result;
 }
 
-/** 执行更新：dsh plugin --profile <p> update wdx-pocket --latest -w（超时保护）。 */
+/** 执行更新：dsh plugin --profile <p> update dsh-wdx-pocket --latest -w（超时保护）。 */
 function performUpdate(profile, { timeoutMs = 180_000 } = {}) {
   return new Promise((resolve) => {
-    const child = spawn('dsh', ['plugin', '--profile', profile, 'update', 'wdx-pocket', '--latest', '-w'], {
+    const child = spawn('dsh', ['plugin', '--profile', profile, 'update', 'dsh-wdx-pocket', '--latest', '-w'], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let out = '';
@@ -107,7 +107,7 @@ export function apply(ctx, config = {}, internals = {}) {
   const logger = ctx.logger?.(name) ?? console;
   const dshPort = internals.dshPort ?? ctx.webServer?.port;
   if (!dshPort) {
-    logger.error('wdx-pocket: webServer port unavailable — cannot start proxy | 拿不到 dsh web 端口，无法启动代理');
+    logger.error('dsh-wdx-pocket: webServer port unavailable — cannot start proxy | 拿不到 dsh web 端口，无法启动代理');
     return () => {};
   }
 
@@ -130,15 +130,15 @@ export function apply(ctx, config = {}, internals = {}) {
 
   // 代理随插件自动启动（局域网二维码开箱即用，零配置）
   void service.startProxy().then((proxy) => {
-    logger.info('wdx-pocket: proxy ready on :%d | 局域网代理已就绪', proxy.port);
+    logger.info('dsh-wdx-pocket: proxy ready on :%d | 局域网代理已就绪', proxy.port);
   }).catch((err) => {
-    logger.error('wdx-pocket: proxy start failed | 代理启动失败: %s', err?.message ?? err);
+    logger.error('dsh-wdx-pocket: proxy start failed | 代理启动失败: %s', err?.message ?? err);
   });
 
   ctx.effect(() => async () => {
     for (const d of disposers.reverse()) { try { d(); } catch { /* 忽略 */ } }
     await service.dispose();
-  }, 'wdx-pocket: stop proxy and tunnel');
+  }, 'dsh-wdx-pocket: stop proxy and tunnel');
 }
 
 export { name, inject, readRestartNotice, consumeRestartNotice };

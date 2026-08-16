@@ -1,17 +1,56 @@
-// wdx-pocket 服务：在 dsh web 进程内跑改头代理 + 公网隧道
+// dsh-wdx-pocket 服务：在 dsh web 进程内跑改头代理 + 公网隧道
 //
 // - 代理：监听 0.0.0.0:<port>（默认 3081），把入站 Host/Origin 改写成
 //   127.0.0.1:<dshPort>（dsh web 实际端口），HTTP + WebSocket 全透传。
 //   这样 DSH 的 /api 浏览器信任栅栏永远看到 loopback，局域网/公网都能进，
 //   且不需要改 dsh 的任何配置（0.0.0.0 绑定被 dsh 官方禁用）。
-// - 隧道：cloudflared 快速隧道（可选），公网 https URL，供人在外面访问。
+// - 隧道：三种公网模式可切换（quick / named / frp），见 tunnel.mjs。
+// - 配置：持久化到 $DSH_HOME/dsh-wdx-pocket/config.json（重启 dsh web 不丢）。
 
-import { networkInterfaces } from 'node:os';
+import { networkInterfaces, homedir } from 'node:os';
 import { createRequire } from 'node:module';
+import { join } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createPocketProxy } from './proxy.mjs';
-import { startQuickTunnel } from './tunnel.mjs';
+import {
+  startQuickTunnel,
+  startNamedTunnel,
+  startFrpTunnel,
+  listNamedTunnelCandidates,
+  pocketDir,
+} from './tunnel.mjs';
 
 const require = createRequire(import.meta.url);
+
+/** 公网隧道模式（顺序即设置页展示顺序）。 */
+export const TUNNEL_MODES = ['quick', 'named', 'frp'];
+
+function configPath(home) {
+  return join(pocketDir(home), 'config.json');
+}
+
+async function loadConfig(home) {
+  try {
+    return JSON.parse(await readFile(configPath(home), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+async function saveConfig(home, cfg) {
+  try {
+    await mkdir(pocketDir(home), { recursive: true });
+    await writeFile(configPath(home), JSON.stringify(cfg, null, 2), 'utf8');
+  } catch { /* 配置写失败不致命，静默 */ }
+}
+
+/** frp token 等敏感字段不回显（掩码）。 */
+function maskedConfig(cfg) {
+  if (!cfg || typeof cfg !== 'object') return null;
+  const out = { ...cfg };
+  if (out.token) out.token = '***';
+  return out;
+}
 
 /** URL → 二维码 data URL（浏览器 <img> 直接显示，全本地不依赖第三方）。 */
 export async function qrDataUrl(text, { width = 220, margin = 1 } = {}) {
@@ -43,8 +82,17 @@ export function createPocketService({
   internals = {},
 } = {}) {
   const createProxy = internals.createProxy ?? createPocketProxy;
-  const startTunnel = internals.startTunnel ?? startQuickTunnel;
+  const startQuick = internals.startTunnel ?? startQuickTunnel; // 向后兼容：internals.startTunnel 仍是 quick 实现的注入点
+  const startNamed = internals.startNamedTunnel ?? startNamedTunnel;
+  const startFrp = internals.startFrpTunnel ?? startFrpTunnel;
   const getLan = internals.lanIPv4 ?? lanIPv4;
+
+  /** 内存中的已保存配置（启动时懒加载；startTunnel 时更新并落盘）。 */
+  let savedConfig = null;
+  async function getSavedConfig() {
+    if (savedConfig === null) savedConfig = await loadConfig(home);
+    return savedConfig;
+  }
 
   let proxy = null;
   let tunnel = null;
@@ -82,26 +130,53 @@ export function createPocketService({
       return proxy;
     },
 
-    /** 启动公网隧道（幂等；返回公网 URL）。进度写进 tunnelState。并发调用单飞。 */
-    async startTunnel() {
+    /**
+     * 启动公网隧道（幂等；返回公网 URL）。进度写进 tunnelState。并发调用单飞。
+     * @param {object} [payload]  { mode?: 'quick'|'named'|'frp', config?: object }
+     *    无参时使用上次保存的模式（默认 quick）。配置会持久化，重启不丢。
+     */
+    async startTunnel(payload = {}) {
       await this.startProxy();
       if (tunnel) return tunnel.url;
-      if (tunnelPromise) return tunnelPromise; // 复用 in-flight，防孤儿 cloudflared
+      if (tunnelPromise) return tunnelPromise; // 复用 in-flight，防孤儿隧道进程
+
+      // 模式解析 + 配置合并（磁盘保存的 + 本次传入的）并持久化
+      const saved = await getSavedConfig();
+      const mode = payload?.mode ?? saved.tunnelMode ?? 'quick';
+      const modeCfg = { ...(saved[mode] ?? {}), ...(payload?.config ?? {}) };
+      if (mode !== 'quick' || payload?.mode || payload?.config) {
+        const next = { ...saved, tunnelMode: mode, [mode]: modeCfg };
+        savedConfig = next;
+        await saveConfig(home, next);
+      }
+
       const controller = new AbortController();
       tunnelAbort = controller;
       tunnelState.startedAt = Date.now();
       const onPhase = (phase) => {
         tunnelState.phase = phase;
-        if (phase === 'downloading') tunnelState.detail = '首次下载 cloudflared（约 20MB）| first run downloads cloudflared (~20MB)';
+        if (phase === 'downloading') tunnelState.detail = '首次下载隧道二进制（约 20MB）| first run downloads tunnel binary (~20MB)';
         else if (phase === 'starting') tunnelState.detail = '启动隧道进程… | starting tunnel…';
-        else if (phase === 'registering') tunnelState.detail = '连接 Cloudflare 边缘（通常 5-30 秒）| connecting to Cloudflare edge (usually 5-30s)';
+        else if (phase === 'registering') tunnelState.detail = mode === 'frp'
+          ? '连接 frp 服务器… | connecting to frp server…'
+          : '连接 Cloudflare 边缘（通常 5-30 秒）| connecting to Cloudflare edge (usually 5-30s)';
         else if (phase === 'ready') tunnelState.detail = '隧道就绪 | ready';
       };
       tunnelPromise = (async () => {
         try {
-          const result = await startTunnel({ port: proxy.port, home, signal: controller.signal, onPhase });
-          // 归一化：startTunnel 契约返回 {url, kill}（字符串也兼容）
-          tunnel = typeof result === 'string' ? { url: result, kill: () => {} } : result;
+          // 按模式分发到对应实现（都返回 {url, kill, onExit}）
+          const impl = mode === 'named' ? startNamed
+            : mode === 'frp' ? startFrp
+            : startQuick;
+          const opts = mode === 'named'
+            ? { port: proxy.port, tunnelName: modeCfg.tunnelName || '', credsDir: modeCfg.credsDir, url: modeCfg.url, home, signal: controller.signal, onPhase }
+            : mode === 'frp'
+              ? { port: proxy.port, frp: modeCfg, home, signal: controller.signal, onPhase }
+              : { port: proxy.port, home, signal: controller.signal, onPhase };
+          const result = await impl(opts);
+          // 归一化：契约返回 {url, kill}（字符串也兼容）
+          tunnel = typeof result === 'string' ? { url: result, kill: () => {}, onExit: undefined } : result;
+          tunnel.mode = mode;
           tunnelState.phase = 'ready';
           // M1：隧道进程运行中死亡（崩溃/被杀）→ 状态打回，别让 UI 永远显示"可用"
           tunnel.onExit?.((code) => {
@@ -145,6 +220,7 @@ export function createPocketService({
       const lan = getLan();
       const proxyPort = proxy?.port ?? null;
       const lanUrl = lan && proxyPort ? `http://${lan}:${proxyPort}` : null;
+      const saved = await getSavedConfig();
       return {
         proxyRunning: proxy !== null,
         proxyPort,
@@ -154,6 +230,12 @@ export function createPocketService({
         tunnelUrl: tunnel?.url ?? null,
         tunnelQr: await qrCached(tunnel?.url ?? null),
         tunnelState: { ...tunnelState },
+        // 三模式：当前模式 + 可用模式 + 已保存配置（敏感字段掩码）+ 本机命名隧道候选
+        tunnelMode: tunnel?.mode ?? saved.tunnelMode ?? null,
+        tunnelModes: [...TUNNEL_MODES],
+        namedConfig: maskedConfig(saved.named),
+        frpConfig: maskedConfig(saved.frp),
+        namedCandidates: await listNamedTunnelCandidates().catch(() => []),
         dshPort,
       };
     },
