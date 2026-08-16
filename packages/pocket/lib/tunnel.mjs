@@ -516,19 +516,12 @@ export async function resolveFrpc({ frpcPath, home, onPhase = () => {}, signal }
   return downloadFrp(bin, signal);
 }
 
-/** 依据 frp 配置拼一个展示用的公网 URL（用户也可在设置页直接填 url 覆盖）。 */
+/** 依据 frp 配置拼一个展示用的公网 URL（http 代理；vhost 端口默认 8080，不占 80）。 */
 function buildFrpUrl(frp) {
+  const vhost = Number(frp.vhostPort) || 8080;
   const domain = (frp.customDomains || '').split(',')[0]?.trim();
-  if (domain) {
-    const proto = frp.protocol === 'https' ? 'https' : 'http';
-    const port = frp.remotePort && Number(frp.remotePort) !== 80 && Number(frp.remotePort) !== 443
-      ? `:${frp.remotePort}` : '';
-    return `${proto}://${domain}${port}`;
-  }
-  if (frp.serverAddr) {
-    const port = frp.remotePort ? `:${frp.remotePort}` : '';
-    return `http://${frp.serverAddr}${port}`;
-  }
+  if (domain) return `http://${domain}:${vhost}`;
+  if (frp.serverAddr) return `http://${frp.serverAddr}:${vhost}`;
   return null;
 }
 
@@ -538,7 +531,7 @@ function buildFrpUrl(frp) {
  *
  * @param {object} opts
  * @param {number} opts.port  本机代理端口
- * @param {object} opts.frp   { serverAddr, serverPort, token, customDomains, remotePort, protocol, url, frpcPath }
+ * @param {object} opts.frp   { serverAddr, serverPort, token, customDomains, vhostPort, url, frpcPath }
  */
 export async function startFrpTunnel({ port, frp = {}, home, signal, onPhase = () => {} }) {
   if (!frp.serverAddr) {
@@ -562,9 +555,6 @@ export async function startFrpTunnel({ port, frp = {}, home, signal, onPhase = (
   const domains = (frp.customDomains || '').split(',').map((s) => s.trim()).filter(Boolean);
   if (domains.length) {
     lines.push(`customDomains = [${domains.map((d) => JSON.stringify(d)).join(', ')}]`);
-  }
-  if (frp.remotePort && Number(frp.remotePort) > 0) {
-    lines.push(`remotePort = ${Number(frp.remotePort)}`);
   }
   await writeFile(tomlPath, lines.join('\n'), 'utf8');
 
@@ -631,22 +621,29 @@ export async function detectNamedTunnelSetup(credsDir) {
 
 /**
  * 一键生成 frps 服务器端配置（含随机 token，与 frpc 自动配对）。
- * 用户在服务器上把内容保存为 frps.toml 并运行 frps -c frps.toml 即可。
+ * vhostHTTPPort 默认 8080（不走 80，避免与主域名已有服务冲突）。
  */
-export function genFrpsConfig({ token, serverPort = 7000, vhostHttpPort = 80 } = {}) {
+export function genFrpsConfig({ token, serverPort = 7000, vhostHttpPort = 8080 } = {}) {
   const lines = [
-    '# frps 服务器端配置（由 dsh-wdx-pocket 一键生成）',
-    '# 用法：保存为 frps.toml，然后在服务器上运行：frps -c frps.toml',
-    '',
+    '# frps 配置（由 dsh-wdx-pocket 一键部署脚本/向导生成）',
     `bindPort = ${Number(serverPort) || 7000}`,
     'auth.method = "token"',
     `auth.token = "${token}"`,
-    `vhostHTTPPort = ${Number(vhostHttpPort) || 80}`,
-    '',
-    '# 提示：vhostHTTPPort 默认 80（需要 root 权限运行 frps）。',
-    '# 若 80 被占用或不想用 root，可改成 8080 等高位端口，手机访问时带上端口即可。',
+    `vhostHTTPPort = ${Number(vhostHttpPort) || 8080}`,
   ];
   return lines.join('\n') + '\n';
+}
+
+/** frps 一键部署脚本（仓库内 deploy/frps-setup.sh）的 raw 地址。 */
+export const FRPS_SETUP_SCRIPT_URL =
+  'https://raw.githubusercontent.com/wudexiong/wdx-dsh-plugins/main/packages/pocket/deploy/frps-setup.sh';
+
+/**
+ * 生成服务器端一键部署命令（一行）：curl 管道执行 frps-setup.sh，参数自带 token。
+ * 国内 raw 下载失败时可用镜像前缀 ghfast.top/ 替换。
+ */
+export function frpsSetupCommand({ token, vhostPort = 8080, bindPort = 7000 } = {}) {
+  return `curl -fsSL ${FRPS_SETUP_SCRIPT_URL} | bash -s -- ${token} ${Number(vhostPort) || 8080} ${Number(bindPort) || 7000}`;
 }
 
 /**

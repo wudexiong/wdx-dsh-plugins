@@ -33,6 +33,118 @@ const styles = {
   checkBad: { color: 'var(--dsw-alias-state-error-primary,#dc2626)', fontSize: 12 },
 };
 
+/**
+ * 公网向导面板（三条路线：快速隧道 / Cloudflare 隧道 / 自己的服务器）。
+ * 设计原则：用户自己选路线（无推荐）；能自动的全自动（host 探测），
+ * 只问"真必须"的信息，且每项都解释为什么需要、去哪拿。
+ * 独立组件：便于渲染冒烟测试覆盖每条路线，防止低级渲染崩溃。
+ */
+function PublicRoutePanel({
+  route, setRoute, detect,
+  namedUrl, setNamedUrl,
+  frpServerAddr, setFrpServerAddr, frpServerPort, setFrpServerPort,
+  frpCustomDomains, setFrpCustomDomains,
+  frpGen, genFrps, frpTest, frpTesting, testFrp,
+  startTunnel, busy, tunnelStarting, tunnelStateDetail, tunnelStateStarted, tunnelPhase,
+  tunnelUrl, tunnelQr, tunnelMode, stopTunnel,
+}) {
+  return h('div', null,
+    tunnelUrl
+      ? h('div', null,
+        h('img', { src: tunnelQr, alt: 'Tunnel QR', style: styles.qr }),
+        h('div', { style: styles.code }, tunnelUrl),
+        h('div', { style: styles.muted },
+          `当前方式：${POCKET_TUNNEL_MODE_LABELS[tunnelMode ?? 'quick'] ?? tunnelMode ?? 'quick'} · `
+          + (tunnelMode === 'quick' ? 'URL 每次重启自动换新' : 'URL 固定，请勿公开')),
+        h('div', { style: styles.warn, marginTop: 4 }, '🔑 链接已泄露？快速隧道重启即换新；命名/frp 模式 URL 固定，请保持私密 | URL leaked? Restart to rotate quick-tunnel URLs; named/frp URLs are fixed — keep them private'),
+        h('button', { style: styles.btn, onClick: stopTunnel }, '关闭公网 | Stop'),
+      )
+      : h('div', null,
+        h('div', { style: styles.muted },
+          '原理：你的电脑没有公网 IP，手机在外面连不上。穿透 = 找一个「中转站」：电脑主动连上它，手机访问它，它把请求转给你电脑。选一条路即可：| How it works: your PC has no public IP — pick a relay route:'),
+        // 路线卡片（自己选，不做推荐）
+        h('div', { style: { ...styles.routeCard, ...(route === 'quick' ? styles.routeCardActive : {}) }, onClick: () => setRoute('quick') },
+          h('div', { style: { fontWeight: 600, fontSize: 13 } }, '🚀 快速隧道 | Quick tunnel'),
+          h('div', { style: styles.muted, marginTop: 2 }, '什么都不用准备，点开启就能用；缺点：国内网络可能打不开 | zero setup; may be blocked in mainland China'),
+        ),
+        h('div', { style: { ...styles.routeCard, ...(route === 'named' ? styles.routeCardActive : {}) }, onClick: () => setRoute('named') },
+          h('div', { style: { fontWeight: 600, fontSize: 13 } }, '🌐 Cloudflare 隧道 | Named tunnel'),
+          h('div', { style: styles.muted, marginTop: 2 }, '用自己的域名走 Cloudflare 免费中转；国内能不能通看运气 | your own domain via Cloudflare; China access not guaranteed'),
+        ),
+        h('div', { style: { ...styles.routeCard, ...(route === 'frp' ? styles.routeCardActive : {}) }, onClick: () => setRoute('frp') },
+          h('div', { style: { fontWeight: 600, fontSize: 13 } }, '🖥 自己的服务器 | Your server'),
+          h('div', { style: styles.muted, marginTop: 2 }, '最稳，国内全链路直连；需要一台有公网 IP 的服务器（几十块/年那种就行）| most stable; needs a cheap VPS'),
+        ),
+        // ---- 路线内容：快速隧道（0 填写）----
+        route === 'quick' ? h('div', { style: { marginTop: 10 } },
+          h('div', { style: styles.muted }, '免费中转，URL 每次开启自动换新（适合临时用/测试）| free relay, URL rotates each start'),
+          h('button', { style: { ...styles.primary, marginTop: 10 }, onClick: startTunnel, disabled: busy || tunnelStarting }, busy ? '开启中…' : '开启公网访问 | Enable'),
+        ) : null,
+        // ---- 路线内容：Cloudflare 隧道（全自动检测，0~1 填写）----
+        route === 'named' ? h('div', { style: { marginTop: 10 } },
+          h('div', { style: styles.label }, '自动检测 | Auto-detected'),
+          h('div', { style: { marginTop: 4 } },
+            h('div', { style: detect?.hasCloudflared ? styles.checkOk : styles.checkBad },
+              `${detect?.hasCloudflared ? '✅' : '❌'} 电脑已安装 cloudflared${detect?.hasCloudflared ? '' : '（安装：npm i -g cloudflared，或 winget install cloudflared）'}`),
+            h('div', { style: { ...(detect?.hasCredentials ? styles.checkOk : styles.checkBad), marginTop: 2 } },
+              `${detect?.hasCredentials ? '✅' : '❌'} 找到命名隧道${detect?.hasCredentials ? `：${detect.tunnels.map((t) => t.name).join('、')}` : '（创建：cloudflared tunnel create 隧道名）'}`),
+            h('div', { style: { ...(detect?.url ? styles.checkOk : styles.checkBad), marginTop: 2 } },
+              `${detect?.url ? '✅' : '❌'} 识别到你的域名${detect?.url ? `：${detect.url}` : '（即绑定在隧道上的域名，Cloudflare 面板 DNS 里能看到）'}`),
+          ),
+          detect?.url ? null : h('div', { style: { marginTop: 8 } },
+            h('div', { style: styles.label }, '你的域名（二维码内容）| Your domain'),
+            h('input', { style: styles.input, value: namedUrl, onChange: (e) => setNamedUrl(e.target.value), placeholder: 'https://live.example.com' }),
+            h('div', { style: styles.muted, marginTop: 4 },
+              '没有？① 打开 Cloudflare 控制台 → 你的域名 → DNS；② 添加记录：类型 CNAME，名称填子域名（如 mobile），目标填你的隧道（xxx.cfargotunnel.com）；或命令行：cloudflared tunnel route dns 隧道名 子域名.你的域名 | no domain? add a CNAME in Cloudflare DNS, or run: cloudflared tunnel route dns <tunnel> <sub.yourdomain.com>'),
+          ),
+          h('div', { style: styles.muted, marginTop: 6 }, '以上全部自动识别（只读你的 cloudflared 配置，绝不修改）| all auto-detected, read-only'),
+          h('button', { style: { ...styles.primary, marginTop: 10 }, onClick: startTunnel, disabled: busy || tunnelStarting || !(detect?.hasCredentials || namedUrl.trim()) }, busy ? '开启中…' : '开启公网访问 | Enable'),
+        ) : null,
+        // ---- 路线内容：自己的服务器（填 1 个 IP + 一键生成部署命令）----
+        route === 'frp' ? h('div', { style: { marginTop: 10 } },
+          h('div', { style: styles.label }, '服务器 IP（必填）| Server IP'),
+          h('input', { style: styles.input, value: frpServerAddr, onChange: (e) => setFrpServerAddr(e.target.value), placeholder: '123.45.67.89' }),
+          h('div', { style: styles.muted, marginTop: 4 }, '就是你云服务器控制台显示的「公网 IP」（买服务器那家的控制台里能看到）| the public IP shown in your cloud console'),
+          h('div', { style: { marginTop: 8 } },
+            frpGen
+              ? h('div', null,
+                h('div', { style: styles.label }, '① 复制下面这一行命令 | copy this one-liner'),
+                h('pre', { style: { ...styles.code, background: 'var(--dsw-alias-bg-layer-2,#f3f4f6)', padding: 8, borderRadius: 8, whiteSpace: 'pre-wrap', maxHeight: 120, overflow: 'auto', marginTop: 4 } }, frpGen.command),
+                h('div', { style: styles.muted, marginTop: 4 },
+                  '② SSH 登录你的服务器，粘贴运行。脚本会自动：下载 frp → 装成系统服务 → 开机自启 → 放行端口。③ 回到这里点「测试连接」| ssh to your server and run it — the script auto-installs frps as a systemd service. Then click Test'),
+                h('div', { style: styles.muted, marginTop: 4 },
+                  '国内下载失败？把命令里的 raw.githubusercontent.com 前面加 ghfast.top/ 再试 | mirror: prefix ghfast.top/ to the raw URL if download fails'),
+              )
+              : h('button', { style: styles.btn, onClick: genFrps }, '① 生成部署命令 | Generate one-liner'),
+          ),
+          h('div', { style: { marginTop: 8 } },
+            h('div', { style: styles.label }, '你的域名/子域名（可选）| Your subdomain (optional)'),
+            h('input', { style: styles.input, value: frpCustomDomains, onChange: (e) => setFrpCustomDomains(e.target.value), placeholder: 'm.example.com（不填则访问 http://服务器IP:8080）' }),
+            h('div', { style: styles.muted, marginTop: 4 },
+              '填了之后：把该子域名的 A 记录解析到服务器 IP，手机访问 http://子域名:8080（frps 用 8080 端口，不占用主域名的 80）| set an A record of the subdomain to your server IP; visits go to http://sub.domain:8080 — port 80 stays yours'),
+          ),
+          h('div', { style: { marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' } },
+            h('button', { style: styles.btn, onClick: testFrp, disabled: frpTesting || !frpServerAddr.trim() }, frpTesting ? '测试中…' : '② 测试连接 | Test'),
+            h('button', { style: styles.primary, onClick: startTunnel, disabled: busy || tunnelStarting || !frpServerAddr.trim() }, busy ? '开启中…' : '③ 开启公网访问 | Enable'),
+          ),
+          frpTest ? h('div', { style: { marginTop: 6, fontSize: 12, color: frpTest.ok ? 'var(--dsw-alias-state-success-primary,#16a34a)' : 'var(--dsw-alias-state-error-primary,#dc2626)' } },
+            frpTest.ok ? '✅ 服务器连接成功，可以开启了' : `❌ ${frpTest.error}`,
+          ) : null,
+        ) : null,
+        tunnelStarting
+          ? h('div', { style: { marginTop: 8, fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)' } },
+            `⏳ ${tunnelStateDetail}（已等待 ${Math.floor((Date.now() - (tunnelStateStarted || Date.now())) / 1000)} 秒）…`)
+          : tunnelPhase === 'error'
+            ? h('div', { style: { marginTop: 8, fontSize: 12, color: 'var(--dsw-alias-state-error-primary,#dc2626)' } },
+              `❌ 开启失败：${tunnelStateDetail || '未知错误 | failed'}（可重试；若是代理/VPN 问题见 README 排障）`)
+            : h('div', null,
+              h('div', { style: styles.warn, marginTop: 8 }, '⚠️ DSH 能执行电脑代码：二维码/URL 就是钥匙，请勿发给别人 | the QR/URL is the key — never share it'),
+              h('div', { style: styles.muted, marginTop: 4 }, '快速隧道重启即换新；命名/frp 模式 URL 固定，泄露后请尽快处理 | Quick URLs rotate on restart; named/frp URLs are fixed — act fast if leaked'),
+            ),
+      ),
+  );
+}
+
 function PocketSettingsTab({ rpcCall }) {
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -46,7 +158,8 @@ function PocketSettingsTab({ rpcCall }) {
   const [namedUrl, setNamedUrl] = useState(''); // 仅自动识别不到域名时需要填
   const [frpServerAddr, setFrpServerAddr] = useState('');
   const [frpServerPort, setFrpServerPort] = useState('7000');
-  const [frpGen, setFrpGen] = useState(null); // 一键生成的服务器配置 {toml, command}
+  const [frpCustomDomains, setFrpCustomDomains] = useState(''); // 可选：自己的子域名
+  const [frpGen, setFrpGen] = useState(null); // 一键生成的部署信息 {command, ...}
   const [frpTest, setFrpTest] = useState(null); // 连接测试结果 {ok, error}
   const [frpTesting, setFrpTesting] = useState(false);
 
@@ -157,7 +270,11 @@ function PocketSettingsTab({ rpcCall }) {
           url: (detect?.url) || namedUrl.trim() || undefined,
         }
       : mode === 'frp'
-        ? { serverAddr: frpServerAddr.trim(), serverPort: Number(frpServerPort) || 7000 }
+        ? {
+            serverAddr: frpServerAddr.trim(),
+            serverPort: Number(frpServerPort) || 7000,
+            customDomains: frpCustomDomains.trim() || undefined,
+          }
         : undefined;
     try {
       setStatus(await call(POCKET_ENDPOINTS.tunnelStart, { mode, config }));
@@ -214,6 +331,8 @@ function PocketSettingsTab({ rpcCall }) {
   const tunnelStarting = ['downloading', 'starting', 'registering'].includes(tunnelPhase);
   const tunnelStateDetail = tunnelState?.detail ?? '';
   const tunnelStateStarted = tunnelState?.startedAt ?? null;
+  // 向导检测清单（host 自动探测：cloudflared/凭据/域名）
+  const detect = status?.detect ?? null;
 
   return h('div', { style: styles.card },
     h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
@@ -269,93 +388,18 @@ function PocketSettingsTab({ rpcCall }) {
         : h('div', { style: styles.muted }, '代理未就绪… | proxy starting…'),
     ),
 
-    // 公网（三模式：快速隧道 / 命名隧道 / frp，设置页可切换）
+    // 公网（向导：快速隧道 / Cloudflare 隧道 / 自己的服务器）
     h('div', { style: styles.block },
       h('div', { style: { fontWeight: 600, fontSize: 13 } }, '🌐 公网（人在外面）| Anywhere'),
-      tunnelUrl
-        ? h('div', null,
-          h('img', { src: status.tunnelQr, alt: 'Tunnel QR', style: styles.qr }),
-          h('div', { style: styles.code }, tunnelUrl),
-          h('div', { style: styles.muted },
-            `当前方式：${POCKET_TUNNEL_MODE_LABELS[status.tunnelMode ?? 'quick'] ?? status.tunnelMode ?? 'quick'} · `
-            + (status.tunnelMode === 'quick' ? 'URL 每次重启自动换新' : 'URL 固定，请勿公开')),
-          h('div', { style: styles.warn, marginTop: 4 }, '🔑 链接已泄露？快速隧道重启即换新；命名/frp 模式 URL 固定，请保持私密 | URL leaked? Restart to rotate quick-tunnel URLs; named/frp URLs are fixed — keep them private'),
-          h('button', { style: styles.btn, onClick: stopTunnel }, '关闭公网 | Stop'),
-        )
-        : h('div', null,
-          h('div', { style: styles.muted },
-            '原理：你的电脑没有公网 IP，手机在外面连不上。穿透 = 找一个「中转站」：电脑主动连上它，手机访问它，它把请求转给你电脑。选一条路即可：| How it works: your PC has no public IP — pick a relay route:'),
-          // 路线卡片（自己选，不做推荐）
-          h('div', { style: { ...styles.routeCard, ...(route === 'quick' ? styles.routeCardActive : {}) }, onClick: () => setRoute('quick') },
-            h('div', { style: { fontWeight: 600, fontSize: 13 } }, '🚀 快速隧道 | Quick tunnel'),
-            h('div', { style: styles.muted, marginTop: 2 }, '什么都不用准备，点开启就能用；缺点：国内网络可能打不开 | zero setup; may be blocked in mainland China'),
-          ),
-          h('div', { style: { ...styles.routeCard, ...(route === 'named' ? styles.routeCardActive : {}) }, onClick: () => setRoute('named') },
-            h('div', { style: { fontWeight: 600, fontSize: 13 } }, '🌐 Cloudflare 隧道 | Named tunnel'),
-            h('div', { style: styles.muted, marginTop: 2 }, '用自己的域名走 Cloudflare 免费中转；国内能不能通看运气 | your own domain via Cloudflare; China access not guaranteed'),
-          ),
-          h('div', { style: { ...styles.routeCard, ...(route === 'frp' ? styles.routeCardActive : {}) }, onClick: () => setRoute('frp') },
-            h('div', { style: { fontWeight: 600, fontSize: 13 } }, '🖥 自己的服务器 | Your server'),
-            h('div', { style: styles.muted, marginTop: 2 }, '最稳，国内全链路直连；需要一台有公网 IP 的服务器（几十块/年那种就行）| most stable; needs a cheap VPS'),
-          ),
-          // ---- 路线内容：快速隧道（0 填写）----
-          route === 'quick' ? h('div', { style: { marginTop: 10 } },
-            h('div', { style: styles.muted }, '免费中转，URL 每次开启自动换新（适合临时用/测试）| free relay, URL rotates each start'),
-            h('button', { style: { ...styles.primary, marginTop: 10 }, onClick: startTunnel, disabled: busy || tunnelStarting }, busy ? '开启中…' : '开启公网访问 | Enable'),
-          ) : null,
-          // ---- 路线内容：Cloudflare 隧道（全自动检测，0~1 填写）----
-          route === 'named' ? h('div', { style: { marginTop: 10 } },
-            h('div', { style: styles.label }, '自动检测 | Auto-detected'),
-            h('div', { style: { marginTop: 4 } },
-              h('div', { style: detect?.hasCloudflared ? styles.checkOk : styles.checkBad },
-                `${detect?.hasCloudflared ? '✅' : '❌'} 电脑已安装 cloudflared${detect?.hasCloudflared ? '' : '（安装：npm i -g cloudflared，或 winget install cloudflared）'}`),
-              h('div', { style: { ...(detect?.hasCredentials ? styles.checkOk : styles.checkBad), marginTop: 2 } },
-                `${detect?.hasCredentials ? '✅' : '❌'} 找到命名隧道${detect?.hasCredentials ? `：${detect.tunnels.map((t) => t.name).join('、')}` : '（创建：cloudflared tunnel create 隧道名）'}`),
-              h('div', { style: { ...(detect?.url ? styles.checkOk : styles.checkBad), marginTop: 2 } },
-                `${detect?.url ? '✅' : '❌'} 识别到你的域名${detect?.url ? `：${detect.url}` : '（即绑定在隧道上的域名，Cloudflare 面板 DNS 里能看到）'}`),
-            ),
-            detect?.url ? null : h('div', { style: { marginTop: 8 } },
-              h('div', { style: styles.label }, '你的域名（二维码内容）| Your domain'),
-              h('input', { style: styles.input, value: namedUrl, onChange: (e) => setNamedUrl(e.target.value), placeholder: 'https://live.example.com' }),
-            ),
-            h('div', { style: styles.muted, marginTop: 6 }, '以上全部自动识别（只读你的 cloudflared 配置，绝不修改）| all auto-detected, read-only'),
-            h('button', { style: { ...styles.primary, marginTop: 10 }, onClick: startTunnel, disabled: busy || tunnelStarting || !(detect?.hasCredentials || namedUrl.trim()) }, busy ? '开启中…' : '开启公网访问 | Enable'),
-          ) : null,
-          // ---- 路线内容：自己的服务器（填 1 个 IP + 一键生成服务器配置）----
-          route === 'frp' ? h('div', { style: { marginTop: 10 } },
-            h('div', { style: styles.label }, '服务器 IP（必填）| Server IP'),
-            h('input', { style: styles.input, value: frpServerAddr, onChange: (e) => setFrpServerAddr(e.target.value), placeholder: '123.45.67.89' }),
-            h('div', { style: styles.muted, marginTop: 4 }, '就是你云服务器控制台显示的「公网 IP」（买服务器那家的控制台里能看到）| the public IP shown in your cloud console'),
-            h('div', { style: { marginTop: 8 } },
-              frpGen
-                ? h('div', null,
-                    h('div', { style: styles.label }, '① 把下面内容保存到服务器（文件名 frps.toml）| save on your server as frps.toml'),
-                    h('pre', { style: { ...styles.code, background: 'var(--dsw-alias-bg-layer-2,#f3f4f6)', padding: 8, borderRadius: 8, whiteSpace: 'pre-wrap', maxHeight: 160, overflow: 'auto', marginTop: 4 } }, frpGen.toml),
-                    h('div', { style: { ...styles.label, marginTop: 8 } }, '② 在服务器上运行（服务器需装有 frps；下载 frp 解压即得）| run on your server'),
-                    h('div', { style: styles.code }, frpGen.command),
-                    h('div', { style: styles.muted, marginTop: 4 }, 'token 已自动配对，本机无需填写 | token auto-paired, nothing to fill here'),
-                  )
-                : h('button', { style: styles.btn, onClick: genFrps }, '① 生成服务器配置 | Generate server config'),
-            ),
-            h('div', { style: { marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' } },
-              h('button', { style: styles.btn, onClick: testFrp, disabled: frpTesting || !frpServerAddr.trim() }, frpTesting ? '测试中…' : '② 测试连接 | Test'),
-              h('button', { style: styles.primary, onClick: startTunnel, disabled: busy || tunnelStarting || !frpServerAddr.trim() }, busy ? '开启中…' : '③ 开启公网访问 | Enable'),
-            ),
-            frpTest ? h('div', { style: { marginTop: 6, fontSize: 12, color: frpTest.ok ? 'var(--dsw-alias-state-success-primary,#16a34a)' : 'var(--dsw-alias-state-error-primary,#dc2626)' } },
-              frpTest.ok ? '✅ 服务器连接成功，可以开启了' : `❌ ${frpTest.error}`,
-            ) : null,
-          ) : null,
-          tunnelStarting
-            ? h('div', { style: { marginTop: 8, fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)' } },
-              `⏳ ${tunnelStateDetail}（已等待 ${Math.floor((Date.now() - (tunnelStateStarted || Date.now())) / 1000)} 秒）…`)
-            : tunnelPhase === 'error'
-              ? h('div', { style: { marginTop: 8, fontSize: 12, color: 'var(--dsw-alias-state-error-primary,#dc2626)' } },
-                `❌ 开启失败：${tunnelStateDetail || '未知错误 | failed'}（可重试；若是代理/VPN 问题见 README 排障）`)
-              : h('div', null,
-                h('div', { style: styles.warn, marginTop: 8 }, '⚠️ DSH 能执行电脑代码：二维码/URL 就是钥匙，请勿发给别人 | the QR/URL is the key — never share it'),
-                h('div', { style: styles.muted, marginTop: 4 }, '快速隧道重启即换新；命名/frp 模式 URL 固定，泄露后请尽快处理 | Quick URLs rotate on restart; named/frp URLs are fixed — act fast if leaked'),
-              ),
-        ),
+      h(PublicRoutePanel, {
+        route, setRoute, detect,
+        namedUrl, setNamedUrl,
+        frpServerAddr, setFrpServerAddr, frpServerPort, setFrpServerPort,
+        frpCustomDomains, setFrpCustomDomains,
+        frpGen, genFrps, frpTest, frpTesting, testFrp,
+        startTunnel, busy, tunnelStarting, tunnelStateDetail, tunnelStateStarted, tunnelPhase,
+        tunnelUrl, tunnelQr: status?.tunnelQr, tunnelMode: status?.tunnelMode, stopTunnel,
+      }),
     ),
 
     error ? h('div', { style: { color: 'var(--dsw-alias-state-error-primary,#dc2626)', fontSize: 12, marginTop: 8 } }, `❌ ${error}`) : null,
@@ -390,4 +434,4 @@ export function apply(ctx) {
   );
 }
 
-export { name, inject, redactStatus };
+export { name, inject, redactStatus, PocketSettingsTab, PublicRoutePanel };

@@ -31,6 +31,8 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // wdx-dsh-plugins/packages/pocket/client/index.jsx
 var index_exports = {};
 __export(index_exports, {
+  PocketSettingsTab: () => PocketSettingsTab,
+  PublicRoutePanel: () => PublicRoutePanel,
   apply: () => apply,
   inject: () => inject,
   name: () => name,
@@ -1312,6 +1314,188 @@ var styles = {
   checkOk: { color: "var(--dsw-alias-state-success-primary,#16a34a)", fontSize: 12 },
   checkBad: { color: "var(--dsw-alias-state-error-primary,#dc2626)", fontSize: 12 }
 };
+function PublicRoutePanel({
+  route,
+  setRoute,
+  detect,
+  namedUrl,
+  setNamedUrl,
+  frpServerAddr,
+  setFrpServerAddr,
+  frpServerPort,
+  setFrpServerPort,
+  frpCustomDomains,
+  setFrpCustomDomains,
+  frpGen,
+  genFrps,
+  frpTest,
+  frpTesting,
+  testFrp,
+  startTunnel,
+  busy,
+  tunnelStarting,
+  tunnelStateDetail,
+  tunnelStateStarted,
+  tunnelPhase,
+  tunnelUrl,
+  tunnelQr,
+  tunnelMode,
+  stopTunnel
+}) {
+  return (0, import_react2.createElement)(
+    "div",
+    null,
+    tunnelUrl ? (0, import_react2.createElement)(
+      "div",
+      null,
+      (0, import_react2.createElement)("img", { src: tunnelQr, alt: "Tunnel QR", style: styles.qr }),
+      (0, import_react2.createElement)("div", { style: styles.code }, tunnelUrl),
+      (0, import_react2.createElement)(
+        "div",
+        { style: styles.muted },
+        `\u5F53\u524D\u65B9\u5F0F\uFF1A${POCKET_TUNNEL_MODE_LABELS[tunnelMode ?? "quick"] ?? tunnelMode ?? "quick"} \xB7 ` + (tunnelMode === "quick" ? "URL \u6BCF\u6B21\u91CD\u542F\u81EA\u52A8\u6362\u65B0" : "URL \u56FA\u5B9A\uFF0C\u8BF7\u52FF\u516C\u5F00")
+      ),
+      (0, import_react2.createElement)("div", { style: styles.warn, marginTop: 4 }, "\u{1F511} \u94FE\u63A5\u5DF2\u6CC4\u9732\uFF1F\u5FEB\u901F\u96A7\u9053\u91CD\u542F\u5373\u6362\u65B0\uFF1B\u547D\u540D/frp \u6A21\u5F0F URL \u56FA\u5B9A\uFF0C\u8BF7\u4FDD\u6301\u79C1\u5BC6 | URL leaked? Restart to rotate quick-tunnel URLs; named/frp URLs are fixed \u2014 keep them private"),
+      (0, import_react2.createElement)("button", { style: styles.btn, onClick: stopTunnel }, "\u5173\u95ED\u516C\u7F51 | Stop")
+    ) : (0, import_react2.createElement)(
+      "div",
+      null,
+      (0, import_react2.createElement)(
+        "div",
+        { style: styles.muted },
+        "\u539F\u7406\uFF1A\u4F60\u7684\u7535\u8111\u6CA1\u6709\u516C\u7F51 IP\uFF0C\u624B\u673A\u5728\u5916\u9762\u8FDE\u4E0D\u4E0A\u3002\u7A7F\u900F = \u627E\u4E00\u4E2A\u300C\u4E2D\u8F6C\u7AD9\u300D\uFF1A\u7535\u8111\u4E3B\u52A8\u8FDE\u4E0A\u5B83\uFF0C\u624B\u673A\u8BBF\u95EE\u5B83\uFF0C\u5B83\u628A\u8BF7\u6C42\u8F6C\u7ED9\u4F60\u7535\u8111\u3002\u9009\u4E00\u6761\u8DEF\u5373\u53EF\uFF1A| How it works: your PC has no public IP \u2014 pick a relay route:"
+      ),
+      // 路线卡片（自己选，不做推荐）
+      (0, import_react2.createElement)(
+        "div",
+        { style: { ...styles.routeCard, ...route === "quick" ? styles.routeCardActive : {} }, onClick: () => setRoute("quick") },
+        (0, import_react2.createElement)("div", { style: { fontWeight: 600, fontSize: 13 } }, "\u{1F680} \u5FEB\u901F\u96A7\u9053 | Quick tunnel"),
+        (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 2 }, "\u4EC0\u4E48\u90FD\u4E0D\u7528\u51C6\u5907\uFF0C\u70B9\u5F00\u542F\u5C31\u80FD\u7528\uFF1B\u7F3A\u70B9\uFF1A\u56FD\u5185\u7F51\u7EDC\u53EF\u80FD\u6253\u4E0D\u5F00 | zero setup; may be blocked in mainland China")
+      ),
+      (0, import_react2.createElement)(
+        "div",
+        { style: { ...styles.routeCard, ...route === "named" ? styles.routeCardActive : {} }, onClick: () => setRoute("named") },
+        (0, import_react2.createElement)("div", { style: { fontWeight: 600, fontSize: 13 } }, "\u{1F310} Cloudflare \u96A7\u9053 | Named tunnel"),
+        (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 2 }, "\u7528\u81EA\u5DF1\u7684\u57DF\u540D\u8D70 Cloudflare \u514D\u8D39\u4E2D\u8F6C\uFF1B\u56FD\u5185\u80FD\u4E0D\u80FD\u901A\u770B\u8FD0\u6C14 | your own domain via Cloudflare; China access not guaranteed")
+      ),
+      (0, import_react2.createElement)(
+        "div",
+        { style: { ...styles.routeCard, ...route === "frp" ? styles.routeCardActive : {} }, onClick: () => setRoute("frp") },
+        (0, import_react2.createElement)("div", { style: { fontWeight: 600, fontSize: 13 } }, "\u{1F5A5} \u81EA\u5DF1\u7684\u670D\u52A1\u5668 | Your server"),
+        (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 2 }, "\u6700\u7A33\uFF0C\u56FD\u5185\u5168\u94FE\u8DEF\u76F4\u8FDE\uFF1B\u9700\u8981\u4E00\u53F0\u6709\u516C\u7F51 IP \u7684\u670D\u52A1\u5668\uFF08\u51E0\u5341\u5757/\u5E74\u90A3\u79CD\u5C31\u884C\uFF09| most stable; needs a cheap VPS")
+      ),
+      // ---- 路线内容：快速隧道（0 填写）----
+      route === "quick" ? (0, import_react2.createElement)(
+        "div",
+        { style: { marginTop: 10 } },
+        (0, import_react2.createElement)("div", { style: styles.muted }, "\u514D\u8D39\u4E2D\u8F6C\uFF0CURL \u6BCF\u6B21\u5F00\u542F\u81EA\u52A8\u6362\u65B0\uFF08\u9002\u5408\u4E34\u65F6\u7528/\u6D4B\u8BD5\uFF09| free relay, URL rotates each start"),
+        (0, import_react2.createElement)("button", { style: { ...styles.primary, marginTop: 10 }, onClick: startTunnel, disabled: busy || tunnelStarting }, busy ? "\u5F00\u542F\u4E2D\u2026" : "\u5F00\u542F\u516C\u7F51\u8BBF\u95EE | Enable")
+      ) : null,
+      // ---- 路线内容：Cloudflare 隧道（全自动检测，0~1 填写）----
+      route === "named" ? (0, import_react2.createElement)(
+        "div",
+        { style: { marginTop: 10 } },
+        (0, import_react2.createElement)("div", { style: styles.label }, "\u81EA\u52A8\u68C0\u6D4B | Auto-detected"),
+        (0, import_react2.createElement)(
+          "div",
+          { style: { marginTop: 4 } },
+          (0, import_react2.createElement)(
+            "div",
+            { style: detect?.hasCloudflared ? styles.checkOk : styles.checkBad },
+            `${detect?.hasCloudflared ? "\u2705" : "\u274C"} \u7535\u8111\u5DF2\u5B89\u88C5 cloudflared${detect?.hasCloudflared ? "" : "\uFF08\u5B89\u88C5\uFF1Anpm i -g cloudflared\uFF0C\u6216 winget install cloudflared\uFF09"}`
+          ),
+          (0, import_react2.createElement)(
+            "div",
+            { style: { ...detect?.hasCredentials ? styles.checkOk : styles.checkBad, marginTop: 2 } },
+            `${detect?.hasCredentials ? "\u2705" : "\u274C"} \u627E\u5230\u547D\u540D\u96A7\u9053${detect?.hasCredentials ? `\uFF1A${detect.tunnels.map((t) => t.name).join("\u3001")}` : "\uFF08\u521B\u5EFA\uFF1Acloudflared tunnel create \u96A7\u9053\u540D\uFF09"}`
+          ),
+          (0, import_react2.createElement)(
+            "div",
+            { style: { ...detect?.url ? styles.checkOk : styles.checkBad, marginTop: 2 } },
+            `${detect?.url ? "\u2705" : "\u274C"} \u8BC6\u522B\u5230\u4F60\u7684\u57DF\u540D${detect?.url ? `\uFF1A${detect.url}` : "\uFF08\u5373\u7ED1\u5B9A\u5728\u96A7\u9053\u4E0A\u7684\u57DF\u540D\uFF0CCloudflare \u9762\u677F DNS \u91CC\u80FD\u770B\u5230\uFF09"}`
+          )
+        ),
+        detect?.url ? null : (0, import_react2.createElement)(
+          "div",
+          { style: { marginTop: 8 } },
+          (0, import_react2.createElement)("div", { style: styles.label }, "\u4F60\u7684\u57DF\u540D\uFF08\u4E8C\u7EF4\u7801\u5185\u5BB9\uFF09| Your domain"),
+          (0, import_react2.createElement)("input", { style: styles.input, value: namedUrl, onChange: (e) => setNamedUrl(e.target.value), placeholder: "https://live.example.com" }),
+          (0, import_react2.createElement)(
+            "div",
+            { style: styles.muted, marginTop: 4 },
+            "\u6CA1\u6709\uFF1F\u2460 \u6253\u5F00 Cloudflare \u63A7\u5236\u53F0 \u2192 \u4F60\u7684\u57DF\u540D \u2192 DNS\uFF1B\u2461 \u6DFB\u52A0\u8BB0\u5F55\uFF1A\u7C7B\u578B CNAME\uFF0C\u540D\u79F0\u586B\u5B50\u57DF\u540D\uFF08\u5982 mobile\uFF09\uFF0C\u76EE\u6807\u586B\u4F60\u7684\u96A7\u9053\uFF08xxx.cfargotunnel.com\uFF09\uFF1B\u6216\u547D\u4EE4\u884C\uFF1Acloudflared tunnel route dns \u96A7\u9053\u540D \u5B50\u57DF\u540D.\u4F60\u7684\u57DF\u540D | no domain? add a CNAME in Cloudflare DNS, or run: cloudflared tunnel route dns <tunnel> <sub.yourdomain.com>"
+          )
+        ),
+        (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 6 }, "\u4EE5\u4E0A\u5168\u90E8\u81EA\u52A8\u8BC6\u522B\uFF08\u53EA\u8BFB\u4F60\u7684 cloudflared \u914D\u7F6E\uFF0C\u7EDD\u4E0D\u4FEE\u6539\uFF09| all auto-detected, read-only"),
+        (0, import_react2.createElement)("button", { style: { ...styles.primary, marginTop: 10 }, onClick: startTunnel, disabled: busy || tunnelStarting || !(detect?.hasCredentials || namedUrl.trim()) }, busy ? "\u5F00\u542F\u4E2D\u2026" : "\u5F00\u542F\u516C\u7F51\u8BBF\u95EE | Enable")
+      ) : null,
+      // ---- 路线内容：自己的服务器（填 1 个 IP + 一键生成部署命令）----
+      route === "frp" ? (0, import_react2.createElement)(
+        "div",
+        { style: { marginTop: 10 } },
+        (0, import_react2.createElement)("div", { style: styles.label }, "\u670D\u52A1\u5668 IP\uFF08\u5FC5\u586B\uFF09| Server IP"),
+        (0, import_react2.createElement)("input", { style: styles.input, value: frpServerAddr, onChange: (e) => setFrpServerAddr(e.target.value), placeholder: "123.45.67.89" }),
+        (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 4 }, "\u5C31\u662F\u4F60\u4E91\u670D\u52A1\u5668\u63A7\u5236\u53F0\u663E\u793A\u7684\u300C\u516C\u7F51 IP\u300D\uFF08\u4E70\u670D\u52A1\u5668\u90A3\u5BB6\u7684\u63A7\u5236\u53F0\u91CC\u80FD\u770B\u5230\uFF09| the public IP shown in your cloud console"),
+        (0, import_react2.createElement)(
+          "div",
+          { style: { marginTop: 8 } },
+          frpGen ? (0, import_react2.createElement)(
+            "div",
+            null,
+            (0, import_react2.createElement)("div", { style: styles.label }, "\u2460 \u590D\u5236\u4E0B\u9762\u8FD9\u4E00\u884C\u547D\u4EE4 | copy this one-liner"),
+            (0, import_react2.createElement)("pre", { style: { ...styles.code, background: "var(--dsw-alias-bg-layer-2,#f3f4f6)", padding: 8, borderRadius: 8, whiteSpace: "pre-wrap", maxHeight: 120, overflow: "auto", marginTop: 4 } }, frpGen.command),
+            (0, import_react2.createElement)(
+              "div",
+              { style: styles.muted, marginTop: 4 },
+              "\u2461 SSH \u767B\u5F55\u4F60\u7684\u670D\u52A1\u5668\uFF0C\u7C98\u8D34\u8FD0\u884C\u3002\u811A\u672C\u4F1A\u81EA\u52A8\uFF1A\u4E0B\u8F7D frp \u2192 \u88C5\u6210\u7CFB\u7EDF\u670D\u52A1 \u2192 \u5F00\u673A\u81EA\u542F \u2192 \u653E\u884C\u7AEF\u53E3\u3002\u2462 \u56DE\u5230\u8FD9\u91CC\u70B9\u300C\u6D4B\u8BD5\u8FDE\u63A5\u300D| ssh to your server and run it \u2014 the script auto-installs frps as a systemd service. Then click Test"
+            ),
+            (0, import_react2.createElement)(
+              "div",
+              { style: styles.muted, marginTop: 4 },
+              "\u56FD\u5185\u4E0B\u8F7D\u5931\u8D25\uFF1F\u628A\u547D\u4EE4\u91CC\u7684 raw.githubusercontent.com \u524D\u9762\u52A0 ghfast.top/ \u518D\u8BD5 | mirror: prefix ghfast.top/ to the raw URL if download fails"
+            )
+          ) : (0, import_react2.createElement)("button", { style: styles.btn, onClick: genFrps }, "\u2460 \u751F\u6210\u90E8\u7F72\u547D\u4EE4 | Generate one-liner")
+        ),
+        (0, import_react2.createElement)(
+          "div",
+          { style: { marginTop: 8 } },
+          (0, import_react2.createElement)("div", { style: styles.label }, "\u4F60\u7684\u57DF\u540D/\u5B50\u57DF\u540D\uFF08\u53EF\u9009\uFF09| Your subdomain (optional)"),
+          (0, import_react2.createElement)("input", { style: styles.input, value: frpCustomDomains, onChange: (e) => setFrpCustomDomains(e.target.value), placeholder: "m.example.com\uFF08\u4E0D\u586B\u5219\u8BBF\u95EE http://\u670D\u52A1\u5668IP:8080\uFF09" }),
+          (0, import_react2.createElement)(
+            "div",
+            { style: styles.muted, marginTop: 4 },
+            "\u586B\u4E86\u4E4B\u540E\uFF1A\u628A\u8BE5\u5B50\u57DF\u540D\u7684 A \u8BB0\u5F55\u89E3\u6790\u5230\u670D\u52A1\u5668 IP\uFF0C\u624B\u673A\u8BBF\u95EE http://\u5B50\u57DF\u540D:8080\uFF08frps \u7528 8080 \u7AEF\u53E3\uFF0C\u4E0D\u5360\u7528\u4E3B\u57DF\u540D\u7684 80\uFF09| set an A record of the subdomain to your server IP; visits go to http://sub.domain:8080 \u2014 port 80 stays yours"
+          )
+        ),
+        (0, import_react2.createElement)(
+          "div",
+          { style: { marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" } },
+          (0, import_react2.createElement)("button", { style: styles.btn, onClick: testFrp, disabled: frpTesting || !frpServerAddr.trim() }, frpTesting ? "\u6D4B\u8BD5\u4E2D\u2026" : "\u2461 \u6D4B\u8BD5\u8FDE\u63A5 | Test"),
+          (0, import_react2.createElement)("button", { style: styles.primary, onClick: startTunnel, disabled: busy || tunnelStarting || !frpServerAddr.trim() }, busy ? "\u5F00\u542F\u4E2D\u2026" : "\u2462 \u5F00\u542F\u516C\u7F51\u8BBF\u95EE | Enable")
+        ),
+        frpTest ? (0, import_react2.createElement)(
+          "div",
+          { style: { marginTop: 6, fontSize: 12, color: frpTest.ok ? "var(--dsw-alias-state-success-primary,#16a34a)" : "var(--dsw-alias-state-error-primary,#dc2626)" } },
+          frpTest.ok ? "\u2705 \u670D\u52A1\u5668\u8FDE\u63A5\u6210\u529F\uFF0C\u53EF\u4EE5\u5F00\u542F\u4E86" : `\u274C ${frpTest.error}`
+        ) : null
+      ) : null,
+      tunnelStarting ? (0, import_react2.createElement)(
+        "div",
+        { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)" } },
+        `\u23F3 ${tunnelStateDetail}\uFF08\u5DF2\u7B49\u5F85 ${Math.floor((Date.now() - (tunnelStateStarted || Date.now())) / 1e3)} \u79D2\uFF09\u2026`
+      ) : tunnelPhase === "error" ? (0, import_react2.createElement)(
+        "div",
+        { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-state-error-primary,#dc2626)" } },
+        `\u274C \u5F00\u542F\u5931\u8D25\uFF1A${tunnelStateDetail || "\u672A\u77E5\u9519\u8BEF | failed"}\uFF08\u53EF\u91CD\u8BD5\uFF1B\u82E5\u662F\u4EE3\u7406/VPN \u95EE\u9898\u89C1 README \u6392\u969C\uFF09`
+      ) : (0, import_react2.createElement)(
+        "div",
+        null,
+        (0, import_react2.createElement)("div", { style: styles.warn, marginTop: 8 }, "\u26A0\uFE0F DSH \u80FD\u6267\u884C\u7535\u8111\u4EE3\u7801\uFF1A\u4E8C\u7EF4\u7801/URL \u5C31\u662F\u94A5\u5319\uFF0C\u8BF7\u52FF\u53D1\u7ED9\u522B\u4EBA | the QR/URL is the key \u2014 never share it"),
+        (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 4 }, "\u5FEB\u901F\u96A7\u9053\u91CD\u542F\u5373\u6362\u65B0\uFF1B\u547D\u540D/frp \u6A21\u5F0F URL \u56FA\u5B9A\uFF0C\u6CC4\u9732\u540E\u8BF7\u5C3D\u5FEB\u5904\u7406 | Quick URLs rotate on restart; named/frp URLs are fixed \u2014 act fast if leaked")
+      )
+    )
+  );
+}
 function PocketSettingsTab({ rpcCall }) {
   const [status, setStatus] = (0, import_react2.useState)(null);
   const [busy, setBusy] = (0, import_react2.useState)(false);
@@ -1324,6 +1508,7 @@ function PocketSettingsTab({ rpcCall }) {
   const [namedUrl, setNamedUrl] = (0, import_react2.useState)("");
   const [frpServerAddr, setFrpServerAddr] = (0, import_react2.useState)("");
   const [frpServerPort, setFrpServerPort] = (0, import_react2.useState)("7000");
+  const [frpCustomDomains, setFrpCustomDomains] = (0, import_react2.useState)("");
   const [frpGen, setFrpGen] = (0, import_react2.useState)(null);
   const [frpTest, setFrpTest] = (0, import_react2.useState)(null);
   const [frpTesting, setFrpTesting] = (0, import_react2.useState)(false);
@@ -1425,7 +1610,11 @@ function PocketSettingsTab({ rpcCall }) {
     const config = mode === "named" ? {
       tunnelName: detect2?.tunnels?.[0]?.name || namedTunnelName.trim() || "",
       url: detect2?.url || namedUrl.trim() || void 0
-    } : mode === "frp" ? { serverAddr: frpServerAddr.trim(), serverPort: Number(frpServerPort) || 7e3 } : void 0;
+    } : mode === "frp" ? {
+      serverAddr: frpServerAddr.trim(),
+      serverPort: Number(frpServerPort) || 7e3,
+      customDomains: frpCustomDomains.trim() || void 0
+    } : void 0;
     try {
       setStatus(await call(POCKET_ENDPOINTS.tunnelStart, { mode, config }));
     } catch (err) {
@@ -1480,6 +1669,7 @@ function PocketSettingsTab({ rpcCall }) {
   const tunnelStarting = ["downloading", "starting", "registering"].includes(tunnelPhase);
   const tunnelStateDetail = tunnelState?.detail ?? "";
   const tunnelStateStarted = tunnelState?.startedAt ?? null;
+  const detect = status?.detect ?? null;
   return (0, import_react2.createElement)(
     "div",
     { style: styles.card },
@@ -1543,137 +1733,39 @@ function PocketSettingsTab({ rpcCall }) {
         (0, import_react2.createElement)("div", { style: styles.muted }, "\u624B\u673A\u8FDE\u63A5\u540C\u4E00 WiFi \u540E\u626B\u7801\u5373\u53EF\u6253\u5F00")
       ) : (0, import_react2.createElement)("div", { style: styles.muted }, "\u4EE3\u7406\u672A\u5C31\u7EEA\u2026 | proxy starting\u2026")
     ),
-    // 公网（三模式：快速隧道 / 命名隧道 / frp，设置页可切换）
+    // 公网（向导：快速隧道 / Cloudflare 隧道 / 自己的服务器）
     (0, import_react2.createElement)(
       "div",
       { style: styles.block },
       (0, import_react2.createElement)("div", { style: { fontWeight: 600, fontSize: 13 } }, "\u{1F310} \u516C\u7F51\uFF08\u4EBA\u5728\u5916\u9762\uFF09| Anywhere"),
-      tunnelUrl ? (0, import_react2.createElement)(
-        "div",
-        null,
-        (0, import_react2.createElement)("img", { src: status.tunnelQr, alt: "Tunnel QR", style: styles.qr }),
-        (0, import_react2.createElement)("div", { style: styles.code }, tunnelUrl),
-        (0, import_react2.createElement)(
-          "div",
-          { style: styles.muted },
-          `\u5F53\u524D\u65B9\u5F0F\uFF1A${POCKET_TUNNEL_MODE_LABELS[status.tunnelMode ?? "quick"] ?? status.tunnelMode ?? "quick"} \xB7 ` + (status.tunnelMode === "quick" ? "URL \u6BCF\u6B21\u91CD\u542F\u81EA\u52A8\u6362\u65B0" : "URL \u56FA\u5B9A\uFF0C\u8BF7\u52FF\u516C\u5F00")
-        ),
-        (0, import_react2.createElement)("div", { style: styles.warn, marginTop: 4 }, "\u{1F511} \u94FE\u63A5\u5DF2\u6CC4\u9732\uFF1F\u5FEB\u901F\u96A7\u9053\u91CD\u542F\u5373\u6362\u65B0\uFF1B\u547D\u540D/frp \u6A21\u5F0F URL \u56FA\u5B9A\uFF0C\u8BF7\u4FDD\u6301\u79C1\u5BC6 | URL leaked? Restart to rotate quick-tunnel URLs; named/frp URLs are fixed \u2014 keep them private"),
-        (0, import_react2.createElement)("button", { style: styles.btn, onClick: stopTunnel }, "\u5173\u95ED\u516C\u7F51 | Stop")
-      ) : (0, import_react2.createElement)(
-        "div",
-        null,
-        (0, import_react2.createElement)(
-          "div",
-          { style: styles.muted },
-          "\u539F\u7406\uFF1A\u4F60\u7684\u7535\u8111\u6CA1\u6709\u516C\u7F51 IP\uFF0C\u624B\u673A\u5728\u5916\u9762\u8FDE\u4E0D\u4E0A\u3002\u7A7F\u900F = \u627E\u4E00\u4E2A\u300C\u4E2D\u8F6C\u7AD9\u300D\uFF1A\u7535\u8111\u4E3B\u52A8\u8FDE\u4E0A\u5B83\uFF0C\u624B\u673A\u8BBF\u95EE\u5B83\uFF0C\u5B83\u628A\u8BF7\u6C42\u8F6C\u7ED9\u4F60\u7535\u8111\u3002\u9009\u4E00\u6761\u8DEF\u5373\u53EF\uFF1A| How it works: your PC has no public IP \u2014 pick a relay route:"
-        ),
-        // 路线卡片（自己选，不做推荐）
-        (0, import_react2.createElement)(
-          "div",
-          { style: { ...styles.routeCard, ...route === "quick" ? styles.routeCardActive : {} }, onClick: () => setRoute("quick") },
-          (0, import_react2.createElement)("div", { style: { fontWeight: 600, fontSize: 13 } }, "\u{1F680} \u5FEB\u901F\u96A7\u9053 | Quick tunnel"),
-          (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 2 }, "\u4EC0\u4E48\u90FD\u4E0D\u7528\u51C6\u5907\uFF0C\u70B9\u5F00\u542F\u5C31\u80FD\u7528\uFF1B\u7F3A\u70B9\uFF1A\u56FD\u5185\u7F51\u7EDC\u53EF\u80FD\u6253\u4E0D\u5F00 | zero setup; may be blocked in mainland China")
-        ),
-        (0, import_react2.createElement)(
-          "div",
-          { style: { ...styles.routeCard, ...route === "named" ? styles.routeCardActive : {} }, onClick: () => setRoute("named") },
-          (0, import_react2.createElement)("div", { style: { fontWeight: 600, fontSize: 13 } }, "\u{1F310} Cloudflare \u96A7\u9053 | Named tunnel"),
-          (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 2 }, "\u7528\u81EA\u5DF1\u7684\u57DF\u540D\u8D70 Cloudflare \u514D\u8D39\u4E2D\u8F6C\uFF1B\u56FD\u5185\u80FD\u4E0D\u80FD\u901A\u770B\u8FD0\u6C14 | your own domain via Cloudflare; China access not guaranteed")
-        ),
-        (0, import_react2.createElement)(
-          "div",
-          { style: { ...styles.routeCard, ...route === "frp" ? styles.routeCardActive : {} }, onClick: () => setRoute("frp") },
-          (0, import_react2.createElement)("div", { style: { fontWeight: 600, fontSize: 13 } }, "\u{1F5A5} \u81EA\u5DF1\u7684\u670D\u52A1\u5668 | Your server"),
-          (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 2 }, "\u6700\u7A33\uFF0C\u56FD\u5185\u5168\u94FE\u8DEF\u76F4\u8FDE\uFF1B\u9700\u8981\u4E00\u53F0\u6709\u516C\u7F51 IP \u7684\u670D\u52A1\u5668\uFF08\u51E0\u5341\u5757/\u5E74\u90A3\u79CD\u5C31\u884C\uFF09| most stable; needs a cheap VPS")
-        ),
-        // ---- 路线内容：快速隧道（0 填写）----
-        route === "quick" ? (0, import_react2.createElement)(
-          "div",
-          { style: { marginTop: 10 } },
-          (0, import_react2.createElement)("div", { style: styles.muted }, "\u514D\u8D39\u4E2D\u8F6C\uFF0CURL \u6BCF\u6B21\u5F00\u542F\u81EA\u52A8\u6362\u65B0\uFF08\u9002\u5408\u4E34\u65F6\u7528/\u6D4B\u8BD5\uFF09| free relay, URL rotates each start"),
-          (0, import_react2.createElement)("button", { style: { ...styles.primary, marginTop: 10 }, onClick: startTunnel, disabled: busy || tunnelStarting }, busy ? "\u5F00\u542F\u4E2D\u2026" : "\u5F00\u542F\u516C\u7F51\u8BBF\u95EE | Enable")
-        ) : null,
-        // ---- 路线内容：Cloudflare 隧道（全自动检测，0~1 填写）----
-        route === "named" ? (0, import_react2.createElement)(
-          "div",
-          { style: { marginTop: 10 } },
-          (0, import_react2.createElement)("div", { style: styles.label }, "\u81EA\u52A8\u68C0\u6D4B | Auto-detected"),
-          (0, import_react2.createElement)(
-            "div",
-            { style: { marginTop: 4 } },
-            (0, import_react2.createElement)(
-              "div",
-              { style: detect?.hasCloudflared ? styles.checkOk : styles.checkBad },
-              `${detect?.hasCloudflared ? "\u2705" : "\u274C"} \u7535\u8111\u5DF2\u5B89\u88C5 cloudflared${detect?.hasCloudflared ? "" : "\uFF08\u5B89\u88C5\uFF1Anpm i -g cloudflared\uFF0C\u6216 winget install cloudflared\uFF09"}`
-            ),
-            (0, import_react2.createElement)(
-              "div",
-              { style: { ...detect?.hasCredentials ? styles.checkOk : styles.checkBad, marginTop: 2 } },
-              `${detect?.hasCredentials ? "\u2705" : "\u274C"} \u627E\u5230\u547D\u540D\u96A7\u9053${detect?.hasCredentials ? `\uFF1A${detect.tunnels.map((t) => t.name).join("\u3001")}` : "\uFF08\u521B\u5EFA\uFF1Acloudflared tunnel create \u96A7\u9053\u540D\uFF09"}`
-            ),
-            (0, import_react2.createElement)(
-              "div",
-              { style: { ...detect?.url ? styles.checkOk : styles.checkBad, marginTop: 2 } },
-              `${detect?.url ? "\u2705" : "\u274C"} \u8BC6\u522B\u5230\u4F60\u7684\u57DF\u540D${detect?.url ? `\uFF1A${detect.url}` : "\uFF08\u5373\u7ED1\u5B9A\u5728\u96A7\u9053\u4E0A\u7684\u57DF\u540D\uFF0CCloudflare \u9762\u677F DNS \u91CC\u80FD\u770B\u5230\uFF09"}`
-            )
-          ),
-          detect?.url ? null : (0, import_react2.createElement)(
-            "div",
-            { style: { marginTop: 8 } },
-            (0, import_react2.createElement)("div", { style: styles.label }, "\u4F60\u7684\u57DF\u540D\uFF08\u4E8C\u7EF4\u7801\u5185\u5BB9\uFF09| Your domain"),
-            (0, import_react2.createElement)("input", { style: styles.input, value: namedUrl, onChange: (e) => setNamedUrl(e.target.value), placeholder: "https://live.example.com" })
-          ),
-          (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 6 }, "\u4EE5\u4E0A\u5168\u90E8\u81EA\u52A8\u8BC6\u522B\uFF08\u53EA\u8BFB\u4F60\u7684 cloudflared \u914D\u7F6E\uFF0C\u7EDD\u4E0D\u4FEE\u6539\uFF09| all auto-detected, read-only"),
-          (0, import_react2.createElement)("button", { style: { ...styles.primary, marginTop: 10 }, onClick: startTunnel, disabled: busy || tunnelStarting || !(detect?.hasCredentials || namedUrl.trim()) }, busy ? "\u5F00\u542F\u4E2D\u2026" : "\u5F00\u542F\u516C\u7F51\u8BBF\u95EE | Enable")
-        ) : null,
-        // ---- 路线内容：自己的服务器（填 1 个 IP + 一键生成服务器配置）----
-        route === "frp" ? (0, import_react2.createElement)(
-          "div",
-          { style: { marginTop: 10 } },
-          (0, import_react2.createElement)("div", { style: styles.label }, "\u670D\u52A1\u5668 IP\uFF08\u5FC5\u586B\uFF09| Server IP"),
-          (0, import_react2.createElement)("input", { style: styles.input, value: frpServerAddr, onChange: (e) => setFrpServerAddr(e.target.value), placeholder: "123.45.67.89" }),
-          (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 4 }, "\u5C31\u662F\u4F60\u4E91\u670D\u52A1\u5668\u63A7\u5236\u53F0\u663E\u793A\u7684\u300C\u516C\u7F51 IP\u300D\uFF08\u4E70\u670D\u52A1\u5668\u90A3\u5BB6\u7684\u63A7\u5236\u53F0\u91CC\u80FD\u770B\u5230\uFF09| the public IP shown in your cloud console"),
-          (0, import_react2.createElement)(
-            "div",
-            { style: { marginTop: 8 } },
-            frpGen ? (0, import_react2.createElement)(
-              "div",
-              null,
-              (0, import_react2.createElement)("div", { style: styles.label }, "\u2460 \u628A\u4E0B\u9762\u5185\u5BB9\u4FDD\u5B58\u5230\u670D\u52A1\u5668\uFF08\u6587\u4EF6\u540D frps.toml\uFF09| save on your server as frps.toml"),
-              (0, import_react2.createElement)("pre", { style: { ...styles.code, background: "var(--dsw-alias-bg-layer-2,#f3f4f6)", padding: 8, borderRadius: 8, whiteSpace: "pre-wrap", maxHeight: 160, overflow: "auto", marginTop: 4 } }, frpGen.toml),
-              (0, import_react2.createElement)("div", { style: { ...styles.label, marginTop: 8 } }, "\u2461 \u5728\u670D\u52A1\u5668\u4E0A\u8FD0\u884C\uFF08\u670D\u52A1\u5668\u9700\u88C5\u6709 frps\uFF1B\u4E0B\u8F7D frp \u89E3\u538B\u5373\u5F97\uFF09| run on your server"),
-              (0, import_react2.createElement)("div", { style: styles.code }, frpGen.command),
-              (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 4 }, "token \u5DF2\u81EA\u52A8\u914D\u5BF9\uFF0C\u672C\u673A\u65E0\u9700\u586B\u5199 | token auto-paired, nothing to fill here")
-            ) : (0, import_react2.createElement)("button", { style: styles.btn, onClick: genFrps }, "\u2460 \u751F\u6210\u670D\u52A1\u5668\u914D\u7F6E | Generate server config")
-          ),
-          (0, import_react2.createElement)(
-            "div",
-            { style: { marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" } },
-            (0, import_react2.createElement)("button", { style: styles.btn, onClick: testFrp, disabled: frpTesting || !frpServerAddr.trim() }, frpTesting ? "\u6D4B\u8BD5\u4E2D\u2026" : "\u2461 \u6D4B\u8BD5\u8FDE\u63A5 | Test"),
-            (0, import_react2.createElement)("button", { style: styles.primary, onClick: startTunnel, disabled: busy || tunnelStarting || !frpServerAddr.trim() }, busy ? "\u5F00\u542F\u4E2D\u2026" : "\u2462 \u5F00\u542F\u516C\u7F51\u8BBF\u95EE | Enable")
-          ),
-          frpTest ? (0, import_react2.createElement)(
-            "div",
-            { style: { marginTop: 6, fontSize: 12, color: frpTest.ok ? "var(--dsw-alias-state-success-primary,#16a34a)" : "var(--dsw-alias-state-error-primary,#dc2626)" } },
-            frpTest.ok ? "\u2705 \u670D\u52A1\u5668\u8FDE\u63A5\u6210\u529F\uFF0C\u53EF\u4EE5\u5F00\u542F\u4E86" : `\u274C ${frpTest.error}`
-          ) : null
-        ) : null,
-        tunnelStarting ? (0, import_react2.createElement)(
-          "div",
-          { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)" } },
-          `\u23F3 ${tunnelStateDetail}\uFF08\u5DF2\u7B49\u5F85 ${Math.floor((Date.now() - (tunnelStateStarted || Date.now())) / 1e3)} \u79D2\uFF09\u2026`
-        ) : tunnelPhase === "error" ? (0, import_react2.createElement)(
-          "div",
-          { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-state-error-primary,#dc2626)" } },
-          `\u274C \u5F00\u542F\u5931\u8D25\uFF1A${tunnelStateDetail || "\u672A\u77E5\u9519\u8BEF | failed"}\uFF08\u53EF\u91CD\u8BD5\uFF1B\u82E5\u662F\u4EE3\u7406/VPN \u95EE\u9898\u89C1 README \u6392\u969C\uFF09`
-        ) : (0, import_react2.createElement)(
-          "div",
-          null,
-          (0, import_react2.createElement)("div", { style: styles.warn, marginTop: 8 }, "\u26A0\uFE0F DSH \u80FD\u6267\u884C\u7535\u8111\u4EE3\u7801\uFF1A\u4E8C\u7EF4\u7801/URL \u5C31\u662F\u94A5\u5319\uFF0C\u8BF7\u52FF\u53D1\u7ED9\u522B\u4EBA | the QR/URL is the key \u2014 never share it"),
-          (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 4 }, "\u5FEB\u901F\u96A7\u9053\u91CD\u542F\u5373\u6362\u65B0\uFF1B\u547D\u540D/frp \u6A21\u5F0F URL \u56FA\u5B9A\uFF0C\u6CC4\u9732\u540E\u8BF7\u5C3D\u5FEB\u5904\u7406 | Quick URLs rotate on restart; named/frp URLs are fixed \u2014 act fast if leaked")
-        )
-      )
+      (0, import_react2.createElement)(PublicRoutePanel, {
+        route,
+        setRoute,
+        detect,
+        namedUrl,
+        setNamedUrl,
+        frpServerAddr,
+        setFrpServerAddr,
+        frpServerPort,
+        setFrpServerPort,
+        frpCustomDomains,
+        setFrpCustomDomains,
+        frpGen,
+        genFrps,
+        frpTest,
+        frpTesting,
+        testFrp,
+        startTunnel,
+        busy,
+        tunnelStarting,
+        tunnelStateDetail,
+        tunnelStateStarted,
+        tunnelPhase,
+        tunnelUrl,
+        tunnelQr: status?.tunnelQr,
+        tunnelMode: status?.tunnelMode,
+        stopTunnel
+      })
     ),
     error ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", fontSize: 12, marginTop: 8 } }, `\u274C ${error}`) : null,
     // 页面最底部：反馈入口

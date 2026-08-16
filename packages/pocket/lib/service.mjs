@@ -20,6 +20,7 @@ import {
   listNamedTunnelCandidates,
   detectNamedTunnelSetup,
   genFrpsConfig,
+  frpsSetupCommand,
   testFrpServer,
   pocketDir,
 } from './tunnel.mjs';
@@ -249,24 +250,21 @@ export function createPocketService({
     },
 
     /**
-     * 一键生成 frps 服务器配置（随机 token 自动配对，token 持久化供 frpc 使用）。
-     * @returns {Promise<{toml:string, command:string, serverPort:number, tokenMasked:string}>}
+     * 一键生成 frps 服务器端部署配置 + 部署命令（token 自动配对，持久化供 frpc 使用）。
+     * @returns {Promise<{toml:string, command:string, serverPort:number, vhostPort:number, tokenMasked:string}>}
      */
     async genFrpsConfig() {
       const saved = await getSavedConfig();
       const frp = saved.frp ?? {};
       const token = frp.token && frp.token !== '***' ? frp.token : randomBytes(16).toString('hex');
       const serverPort = Number(frp.serverPort) || 7000;
-      const toml = genFrpsConfig({ token, serverPort });
-      const next = { ...saved, frp: { ...frp, token, serverPort } };
+      const vhostPort = Number(frp.vhostPort) || 8080;
+      const toml = genFrpsConfig({ token, serverPort, vhostHttpPort: vhostPort });
+      const command = frpsSetupCommand({ token, vhostPort, bindPort: serverPort });
+      const next = { ...saved, frp: { ...frp, token, serverPort, vhostPort } };
       savedConfig = next;
       await saveConfig(home, next);
-      return {
-        toml,
-        command: 'frps -c frps.toml',
-        serverPort,
-        tokenMasked: token.slice(0, 4) + '…',
-      };
+      return { toml, command, serverPort, vhostPort, tokenMasked: token.slice(0, 4) + '…' };
     },
 
     /**
