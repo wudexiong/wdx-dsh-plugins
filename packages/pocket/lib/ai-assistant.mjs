@@ -74,13 +74,34 @@ export async function createConfigAgent(ctx, { route, task, service }) {
   if (!agents) throw new Error('agents 服务不可用，无法创建 AI 配置对话');
   if (typeof agents.create !== 'function') throw new Error('agents.create 不可用');
 
+  // 继承当前默认模型选择：程序化创建的 agent 必须带 provider/model，
+  // 否则 DSH 的 deployment:persona 等 section 里 {{model}} 变量组装失败。
+  let selection = null;
+  try {
+    selection = ctx.get('agentDefaultModel')?.currentSelection?.() ?? null;
+  } catch { /* 拿不到就交给宿主默认 */ }
+  const agentOptions = selection?.provider && selection?.model
+    ? { provider: selection.provider, model: selection.model }
+    : undefined;
+
   const sessionId = `session-wdxai-${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`;
   const cwd = process.env.PWD || process.cwd?.() || 'D:\\tools\\deepseek_plugins';
 
   const handle = await agents.create({
     sessionId,
     meta: { cwd, origin: 'subagent' },
-    setup(agentCtx) {
+    agentOptions,
+    async setup(agentCtx) {
+      // 安装模型选择：填充 {{model}} 等提示词变量 + 请求路由（缺失会报
+      // 'prompt variable "{{model}}" has no value' 并中断整个 prompt 组装）
+      if (selection?.provider && selection?.model) {
+        try {
+          const mod = await import('@deepseek-ai/dsh-agent').catch(() => null);
+          mod?.installModelSelection?.(agentCtx, { current: selection, assembled: selection });
+        } catch (err) {
+          console.error('dsh-wdx-pocket: installModelSelection failed:', err?.message ?? err);
+        }
+      }
       // 注入提示词（注册到 agent 自身作用域）
       const sp = agentCtx.get('systemPrompt');
       if (sp?.section) {
