@@ -7,6 +7,7 @@ export const POCKET_ENDPOINTS = Object.freeze({
   tunnelStop: 'tunnel.stop',
   frpGenConfig: 'frp.genConfig',
   frpTest: 'frp.test',
+  aiStart: 'ai.start',
   version: 'pocket.version',
   update: 'pocket.update',
   restart: 'pocket.restart',

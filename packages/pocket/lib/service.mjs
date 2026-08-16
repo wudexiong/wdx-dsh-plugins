@@ -275,6 +275,23 @@ export function createPocketService({
     },
 
     /**
+     * AI 配置助手回写：把 AI 完成的 frp 配置合并进插件配置并持久化。
+     * @param {object} cfg { serverAddr, serverPort, vhostPort, customDomains, tunnelUrl }
+     */
+    async applyAiConfig(cfg = {}) {
+      const saved = await getSavedConfig();
+      const frp = { ...(saved.frp ?? {}) };
+      if (cfg.serverAddr) frp.serverAddr = String(cfg.serverAddr);
+      if (cfg.serverPort) frp.serverPort = Number(cfg.serverPort);
+      if (cfg.vhostPort) frp.vhostPort = Number(cfg.vhostPort);
+      if (cfg.customDomains) frp.customDomains = String(cfg.customDomains);
+      if (cfg.tunnelUrl) frp.url = String(cfg.tunnelUrl);
+      const next = { ...saved, frp, tunnelMode: 'frp' };
+      savedConfig = next;
+      await saveConfig(home, next);
+    },
+
+    /**
      * 测试 frp 服务器连通性（TCP 握手）。
      * @param {object} config { serverAddr, serverPort }
      * @returns {Promise<{ok:boolean, error?:string}>}

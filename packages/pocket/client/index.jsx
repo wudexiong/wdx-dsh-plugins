@@ -13,7 +13,7 @@ import { POCKET_RPC_CHANNEL, POCKET_ENDPOINTS, redactStatus, compareVersions, PO
 import { mobileApply } from './mobile/mobile-apply.tsx';
 
 const name = 'dsh-wdx-pocket';
-const inject = ['slots', 'connection', 'layout', 'locale', 'sessionLogDownload'];
+const inject = ['slots', 'connection', 'layout', 'locale', 'sessionLogDownload', 'sessions'];
 
 const styles = {
   card: { background: 'var(--dsw-alias-bg-layer-1,#fff)', border: '1px solid var(--dsw-alias-border-l2,#e5e7eb)', borderRadius: 12, padding: '14px 16px', maxWidth: 480 },
@@ -47,6 +47,7 @@ function PublicRoutePanel({
   frpCustomDomains, setFrpCustomDomains,
   frpGen, genFrps, frpTest, frpTesting, testFrp,
   frpCopyMode, setFrpCopyMode, frpCopied, copyText,
+  aiStart, aiState,
   startTunnel, busy, tunnelStarting, tunnelStateDetail, tunnelStateStarted, tunnelPhase,
   tunnelUrl, tunnelQr, tunnelMode, stopTunnel,
 }) {
@@ -102,8 +103,21 @@ function PublicRoutePanel({
           h('div', { style: styles.muted, marginTop: 6 }, '以上全部自动识别（只读你的 cloudflared 配置，绝不修改）| all auto-detected, read-only'),
           h('button', { style: { ...styles.primary, marginTop: 10 }, onClick: startTunnel, disabled: busy || tunnelStarting || !(detect?.hasCredentials || namedUrl.trim()) }, busy ? '开启中…' : '开启公网访问 | Enable'),
         ) : null,
-        // ---- 路线内容：自己的服务器（填 1 个 IP + 一键生成部署命令）----
+        // ---- 路线内容：自己的服务器（AI 一键配置 / 手动两步）----
         route === 'frp' ? h('div', { style: { marginTop: 10 } },
+          h('div', { style: { ...styles.routeCardActive, padding: '10px 12px', borderRadius: 10 } },
+            h('div', { style: { fontWeight: 600, fontSize: 13 } }, '🤖 AI 帮我配置（推荐）| Let AI configure'),
+            h('div', { style: styles.muted, marginTop: 2 }, '自动开新对话，AI 引导你完成：只问你服务器 IP 和 SSH 授权方式，其余（上传 frp、部署、nginx 分流、权限清理）全自动 | AI opens a chat and walks you through: you only provide server IP + SSH permission'),
+            h('button', { style: { ...styles.primary, marginTop: 8 }, onClick: aiStart, disabled: aiState === 'starting' }, aiState === 'starting' ? '正在打开 AI 对话…' : '🤖 让 AI 帮我配置 | Let AI configure'),
+            aiState === 'opened'
+              ? h('div', { style: { ...styles.checkOk, marginTop: 6 } }, '✅ 已打开 AI 配置对话（见左侧新会话），按对话里的指引回复即可 | AI chat opened — follow the prompts in the new session')
+              : null,
+          ),
+          h('div', { style: { marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 } },
+            h('div', { style: { flex: 1, borderTop: '1px solid var(--dsw-alias-border-l2,#e5e7eb)' } }),
+            h('div', { style: styles.muted }, '或手动配置 | or manual'),
+            h('div', { style: { flex: 1, borderTop: '1px solid var(--dsw-alias-border-l2,#e5e7eb)' } }),
+          ),
           h('div', { style: styles.label }, '服务器 IP（必填）| Server IP'),
           h('input', { style: styles.input, value: frpServerAddr, onChange: (e) => setFrpServerAddr(e.target.value), placeholder: '123.45.67.89' }),
           h('div', { style: styles.muted, marginTop: 4 }, '就是你云服务器控制台显示的「公网 IP」（买服务器那家的控制台里能看到）| the public IP shown in your cloud console'),
@@ -172,7 +186,7 @@ function PublicRoutePanel({
   );
 }
 
-function PocketSettingsTab({ rpcCall }) {
+function PocketSettingsTab({ rpcCall, sessionsOpen }) {
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -192,6 +206,7 @@ function PocketSettingsTab({ rpcCall }) {
   const [frpTesting, setFrpTesting] = useState(false);
   const [frpCopyMode, setFrpCopyMode] = useState('script'); // 展示方式：完整脚本 / 一行命令
   const [frpCopied, setFrpCopied] = useState(false); // 复制成功反馈
+  const [aiState, setAiState] = useState('idle'); // AI 配置助手状态：idle|starting|opened|error
 
   const call = async (endpoint, payload) => {
     const res = await rpcCall(endpoint, payload);
@@ -369,6 +384,23 @@ function PocketSettingsTab({ rpcCall }) {
     }
   };
 
+  // 🤖 AI 帮我配置：创建子 agent 新对话，AI 自主完成公网穿透配置
+  const aiStart = async () => {
+    setAiState('starting');
+    setError(null);
+    try {
+      const r = await call(POCKET_ENDPOINTS.aiStart, { route: 'frp' });
+      setAiState('opened');
+      // 侧边栏自动切到新会话（r.sessionId）
+      try {
+        sessionsOpen?.(r.sessionId);
+      } catch { /* 切换失败不影响 */ }
+    } catch (err) {
+      setAiState('error');
+      setError(`AI 配置助手启动失败：${err.message}`);
+    }
+  };
+
   // 状态轮询回来时：同步检测结果与已保存配置（只在未手动改动时预填）
   useEffect(() => {
     if (!status) return;
@@ -461,6 +493,7 @@ function PocketSettingsTab({ rpcCall }) {
         frpVhostPort, setFrpVhostPort,
         frpGen, genFrps, frpTest, frpTesting, testFrp,
         frpCopyMode, setFrpCopyMode, frpCopied, copyText,
+        aiStart, aiState,
         startTunnel, busy, tunnelStarting, tunnelStateDetail, tunnelStateStarted, tunnelPhase,
         tunnelUrl, tunnelQr: status?.tunnelQr, tunnelMode: status?.tunnelMode, stopTunnel,
       }),
@@ -491,7 +524,7 @@ export function apply(ctx) {
         id: 'pocket',
         order: 1,
         label: () => '手机访问',
-        inject: () => ({ rpcCall }),
+        inject: () => ({ rpcCall, sessionsOpen: (id) => ctx.sessions?.open(id) }),
       },
       PocketSettingsTab,
     ),

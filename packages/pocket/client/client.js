@@ -49,6 +49,7 @@ var POCKET_ENDPOINTS = Object.freeze({
   tunnelStop: "tunnel.stop",
   frpGenConfig: "frp.genConfig",
   frpTest: "frp.test",
+  aiStart: "ai.start",
   version: "pocket.version",
   update: "pocket.update",
   restart: "pocket.restart"
@@ -1296,7 +1297,7 @@ function mobileApply(ctx) {
 
 // wdx-dsh-plugins/packages/pocket/client/index.jsx
 var name = "dsh-wdx-pocket";
-var inject = ["slots", "connection", "layout", "locale", "sessionLogDownload"];
+var inject = ["slots", "connection", "layout", "locale", "sessionLogDownload", "sessions"];
 var styles = {
   card: { background: "var(--dsw-alias-bg-layer-1,#fff)", border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", borderRadius: 12, padding: "14px 16px", maxWidth: 480 },
   block: { borderTop: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", marginTop: 12, paddingTop: 12 },
@@ -1337,6 +1338,8 @@ function PublicRoutePanel({
   setFrpCopyMode,
   frpCopied,
   copyText,
+  aiStart,
+  aiState,
   startTunnel,
   busy,
   tunnelStarting,
@@ -1435,10 +1438,25 @@ function PublicRoutePanel({
         (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 6 }, "\u4EE5\u4E0A\u5168\u90E8\u81EA\u52A8\u8BC6\u522B\uFF08\u53EA\u8BFB\u4F60\u7684 cloudflared \u914D\u7F6E\uFF0C\u7EDD\u4E0D\u4FEE\u6539\uFF09| all auto-detected, read-only"),
         (0, import_react2.createElement)("button", { style: { ...styles.primary, marginTop: 10 }, onClick: startTunnel, disabled: busy || tunnelStarting || !(detect?.hasCredentials || namedUrl.trim()) }, busy ? "\u5F00\u542F\u4E2D\u2026" : "\u5F00\u542F\u516C\u7F51\u8BBF\u95EE | Enable")
       ) : null,
-      // ---- 路线内容：自己的服务器（填 1 个 IP + 一键生成部署命令）----
+      // ---- 路线内容：自己的服务器（AI 一键配置 / 手动两步）----
       route === "frp" ? (0, import_react2.createElement)(
         "div",
         { style: { marginTop: 10 } },
+        (0, import_react2.createElement)(
+          "div",
+          { style: { ...styles.routeCardActive, padding: "10px 12px", borderRadius: 10 } },
+          (0, import_react2.createElement)("div", { style: { fontWeight: 600, fontSize: 13 } }, "\u{1F916} AI \u5E2E\u6211\u914D\u7F6E\uFF08\u63A8\u8350\uFF09| Let AI configure"),
+          (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 2 }, "\u81EA\u52A8\u5F00\u65B0\u5BF9\u8BDD\uFF0CAI \u5F15\u5BFC\u4F60\u5B8C\u6210\uFF1A\u53EA\u95EE\u4F60\u670D\u52A1\u5668 IP \u548C SSH \u6388\u6743\u65B9\u5F0F\uFF0C\u5176\u4F59\uFF08\u4E0A\u4F20 frp\u3001\u90E8\u7F72\u3001nginx \u5206\u6D41\u3001\u6743\u9650\u6E05\u7406\uFF09\u5168\u81EA\u52A8 | AI opens a chat and walks you through: you only provide server IP + SSH permission"),
+          (0, import_react2.createElement)("button", { style: { ...styles.primary, marginTop: 8 }, onClick: aiStart, disabled: aiState === "starting" }, aiState === "starting" ? "\u6B63\u5728\u6253\u5F00 AI \u5BF9\u8BDD\u2026" : "\u{1F916} \u8BA9 AI \u5E2E\u6211\u914D\u7F6E | Let AI configure"),
+          aiState === "opened" ? (0, import_react2.createElement)("div", { style: { ...styles.checkOk, marginTop: 6 } }, "\u2705 \u5DF2\u6253\u5F00 AI \u914D\u7F6E\u5BF9\u8BDD\uFF08\u89C1\u5DE6\u4FA7\u65B0\u4F1A\u8BDD\uFF09\uFF0C\u6309\u5BF9\u8BDD\u91CC\u7684\u6307\u5F15\u56DE\u590D\u5373\u53EF | AI chat opened \u2014 follow the prompts in the new session") : null
+        ),
+        (0, import_react2.createElement)(
+          "div",
+          { style: { marginTop: 10, display: "flex", alignItems: "center", gap: 8 } },
+          (0, import_react2.createElement)("div", { style: { flex: 1, borderTop: "1px solid var(--dsw-alias-border-l2,#e5e7eb)" } }),
+          (0, import_react2.createElement)("div", { style: styles.muted }, "\u6216\u624B\u52A8\u914D\u7F6E | or manual"),
+          (0, import_react2.createElement)("div", { style: { flex: 1, borderTop: "1px solid var(--dsw-alias-border-l2,#e5e7eb)" } })
+        ),
         (0, import_react2.createElement)("div", { style: styles.label }, "\u670D\u52A1\u5668 IP\uFF08\u5FC5\u586B\uFF09| Server IP"),
         (0, import_react2.createElement)("input", { style: styles.input, value: frpServerAddr, onChange: (e) => setFrpServerAddr(e.target.value), placeholder: "123.45.67.89" }),
         (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 4 }, "\u5C31\u662F\u4F60\u4E91\u670D\u52A1\u5668\u63A7\u5236\u53F0\u663E\u793A\u7684\u300C\u516C\u7F51 IP\u300D\uFF08\u4E70\u670D\u52A1\u5668\u90A3\u5BB6\u7684\u63A7\u5236\u53F0\u91CC\u80FD\u770B\u5230\uFF09| the public IP shown in your cloud console"),
@@ -1537,7 +1555,7 @@ function PublicRoutePanel({
     )
   );
 }
-function PocketSettingsTab({ rpcCall }) {
+function PocketSettingsTab({ rpcCall, sessionsOpen }) {
   const [status, setStatus] = (0, import_react2.useState)(null);
   const [busy, setBusy] = (0, import_react2.useState)(false);
   const [error, setError] = (0, import_react2.useState)(null);
@@ -1556,6 +1574,7 @@ function PocketSettingsTab({ rpcCall }) {
   const [frpTesting, setFrpTesting] = (0, import_react2.useState)(false);
   const [frpCopyMode, setFrpCopyMode] = (0, import_react2.useState)("script");
   const [frpCopied, setFrpCopied] = (0, import_react2.useState)(false);
+  const [aiState, setAiState] = (0, import_react2.useState)("idle");
   const call = async (endpoint, payload) => {
     const res = await rpcCall(endpoint, payload);
     if (!res?.ok) throw new Error(res?.error?.message ?? "RPC failed");
@@ -1720,6 +1739,21 @@ function PocketSettingsTab({ rpcCall }) {
       setFrpTesting(false);
     }
   };
+  const aiStart = async () => {
+    setAiState("starting");
+    setError(null);
+    try {
+      const r = await call(POCKET_ENDPOINTS.aiStart, { route: "frp" });
+      setAiState("opened");
+      try {
+        sessionsOpen?.(r.sessionId);
+      } catch {
+      }
+    } catch (err) {
+      setAiState("error");
+      setError(`AI \u914D\u7F6E\u52A9\u624B\u542F\u52A8\u5931\u8D25\uFF1A${err.message}`);
+    }
+  };
   (0, import_react2.useEffect)(() => {
     if (!status) return;
     const detect2 = status.detect;
@@ -1834,6 +1868,8 @@ function PocketSettingsTab({ rpcCall }) {
         setFrpCopyMode,
         frpCopied,
         copyText,
+        aiStart,
+        aiState,
         startTunnel,
         busy,
         tunnelStarting,
@@ -1870,7 +1906,7 @@ function apply(ctx) {
         id: "pocket",
         order: 1,
         label: () => "\u624B\u673A\u8BBF\u95EE",
-        inject: () => ({ rpcCall })
+        inject: () => ({ rpcCall, sessionsOpen: (id) => ctx.sessions?.open(id) })
       },
       PocketSettingsTab
     )

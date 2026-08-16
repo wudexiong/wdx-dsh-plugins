@@ -55,6 +55,7 @@ test('公网向导渲染冒烟：三条路线 + 无域名分支 + 已开启视�
     frpGen: null, genFrps: () => {},
     frpTest: null, frpTesting: false, testFrp: () => {},
     frpCopyMode: 'script', setFrpCopyMode: () => {}, frpCopied: false, copyText: () => {},
+    aiStart: () => {}, aiState: 'idle',
     startTunnel: () => {}, busy: false, tunnelStarting: false,
     tunnelStateDetail: '', tunnelStateStarted: null, tunnelPhase: 'idle',
     tunnelUrl: null, tunnelQr: null, tunnelMode: null, stopTunnel: () => {},

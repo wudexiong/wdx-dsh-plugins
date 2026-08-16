@@ -1,6 +1,7 @@
 // dsh-wdx-pocket Web RPC（loopback-only）：设置页 ⇄ Host 的手机访问通道
 
 import { POCKET_RPC_CHANNEL, POCKET_ENDPOINTS, redactStatus } from '../client/api.js';
+import { createConfigAgent } from './ai-assistant.mjs';
 
 function ok(value) {
   return { ok: true, value };
@@ -61,6 +62,14 @@ export function installPocketRpc(ctx, { service, log = console, runUpdate = null
       if (endpoint === POCKET_ENDPOINTS.frpTest) {
         // 测试 frp 服务器连通性：{ config: { serverAddr, serverPort } }
         return ok(await service.testFrpServer(payload?.config ?? {}));
+      }
+      if (endpoint === POCKET_ENDPOINTS.aiStart) {
+        // AI 配置助手：创建子 agent 新对话，自主完成公网穿透配置
+        // payload: { route?: 'frp'|'quick'|'named', task?: string }
+        const route = payload?.route ?? 'frp';
+        const task = payload?.task
+          ?? `请帮我配置 dsh-wdx-pocket 的「${route === 'frp' ? 'frp 服务器' : route}」公网穿透。按照你的配置手册执行，需要我提供什么（如服务器 IP、SSH 授权）就直接问我。`;
+        return ok(await createConfigAgent(ctx, { route, task, service }));
       }
       if (endpoint === POCKET_ENDPOINTS.version) {
         return ok({ current: runUpdate?.currentVersion?.() ?? null, loaded: runUpdate?.loadedVersion?.() ?? null });
