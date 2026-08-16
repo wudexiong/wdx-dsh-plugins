@@ -50,8 +50,11 @@ test('公网向导渲染冒烟：三条路线 + 无域名分支 + 已开启视�
     namedUrl: '', setNamedUrl: () => {},
     frpServerAddr: '', setFrpServerAddr: () => {},
     frpServerPort: '7000', setFrpServerPort: () => {},
+    frpVhostPort: '9527', setFrpVhostPort: () => {},
+    frpCustomDomains: '', setFrpCustomDomains: () => {},
     frpGen: null, genFrps: () => {},
     frpTest: null, frpTesting: false, testFrp: () => {},
+    frpCopyMode: 'script', setFrpCopyMode: () => {}, frpCopied: false, copyText: () => {},
     startTunnel: () => {}, busy: false, tunnelStarting: false,
     tunnelStateDetail: '', tunnelStateStarted: null, tunnelPhase: 'idle',
     tunnelUrl: null, tunnelQr: null, tunnelMode: null, stopTunnel: () => {},
@@ -62,6 +65,18 @@ test('公网向导渲染冒烟：三条路线 + 无域名分支 + 已开启视�
     const html = renderToString(h(PublicRoutePanel, { ...base, route }));
     assert.ok(html.length > 100, `route=${route} 渲染出内容`);
   }
+
+  // 生成后展开（frpGen 非空）：完整脚本分支 + 一行命令分支都必须渲染
+  // （回归：props 漏传 frpCopyMode/copyText 曾导致点击「生成」后整页空白）
+  const frpGen = {
+    command: 'curl -fsSL https://example.com/frps-setup.sh | bash',
+    script: '#!/usr/bin/env bash\nTOKEN="t"\nVHOST="9527"\nBIND="7000"\nSUB=""\necho ok\n',
+    serverPort: 7000, vhostPort: 9527, tokenMasked: 't…',
+  };
+  const htmlScript = renderToString(h(PublicRoutePanel, { ...base, route: 'frp', frpGen, frpCopyMode: 'script' }));
+  assert.ok(htmlScript.includes('一键复制完整脚本'), '完整脚本分支渲染（含复制按钮）');
+  const htmlCommand = renderToString(h(PublicRoutePanel, { ...base, route: 'frp', frpGen, frpCopyMode: 'command' }));
+  assert.ok(htmlCommand.includes('复制命令'), '一行命令分支渲染');
 
   // 无域名分支：显示域名输入框 + Cloudflare 引导
   const htmlNoUrl = renderToString(h(PublicRoutePanel, {

@@ -1333,6 +1333,10 @@ function PublicRoutePanel({
   frpTest,
   frpTesting,
   testFrp,
+  frpCopyMode,
+  setFrpCopyMode,
+  frpCopied,
+  copyText,
   startTunnel,
   busy,
   tunnelStarting,
@@ -1550,8 +1554,8 @@ function PocketSettingsTab({ rpcCall }) {
   const [frpGen, setFrpGen] = (0, import_react2.useState)(null);
   const [frpTest, setFrpTest] = (0, import_react2.useState)(null);
   const [frpTesting, setFrpTesting] = (0, import_react2.useState)(false);
-  const [frpCopyMode2, setFrpCopyMode2] = (0, import_react2.useState)("script");
-  const [frpCopied2, setFrpCopied] = (0, import_react2.useState)(false);
+  const [frpCopyMode, setFrpCopyMode] = (0, import_react2.useState)("script");
+  const [frpCopied, setFrpCopied] = (0, import_react2.useState)(false);
   const call = async (endpoint, payload) => {
     const res = await rpcCall(endpoint, payload);
     if (!res?.ok) throw new Error(res?.error?.message ?? "RPC failed");
@@ -1684,7 +1688,7 @@ function PocketSettingsTab({ rpcCall }) {
       setError(err.message);
     }
   };
-  const copyText2 = async (text) => {
+  const copyText = async (text) => {
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);
@@ -1826,6 +1830,10 @@ function PocketSettingsTab({ rpcCall }) {
         frpTest,
         frpTesting,
         testFrp,
+        frpCopyMode,
+        setFrpCopyMode,
+        frpCopied,
+        copyText,
         startTunnel,
         busy,
         tunnelStarting,

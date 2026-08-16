@@ -46,6 +46,7 @@ function PublicRoutePanel({
   frpVhostPort, setFrpVhostPort,
   frpCustomDomains, setFrpCustomDomains,
   frpGen, genFrps, frpTest, frpTesting, testFrp,
+  frpCopyMode, setFrpCopyMode, frpCopied, copyText,
   startTunnel, busy, tunnelStarting, tunnelStateDetail, tunnelStateStarted, tunnelPhase,
   tunnelUrl, tunnelQr, tunnelMode, stopTunnel,
 }) {
@@ -459,6 +460,7 @@ function PocketSettingsTab({ rpcCall }) {
         frpCustomDomains, setFrpCustomDomains,
         frpVhostPort, setFrpVhostPort,
         frpGen, genFrps, frpTest, frpTesting, testFrp,
+        frpCopyMode, setFrpCopyMode, frpCopied, copyText,
         startTunnel, busy, tunnelStarting, tunnelStateDetail, tunnelStateStarted, tunnelPhase,
         tunnelUrl, tunnelQr: status?.tunnelQr, tunnelMode: status?.tunnelMode, stopTunnel,
       }),
