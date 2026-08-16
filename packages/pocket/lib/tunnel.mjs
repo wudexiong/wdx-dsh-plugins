@@ -7,6 +7,7 @@ import { spawn, execSync } from 'node:child_process';
 import { mkdir, access, chmod, rm, stat, readdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
+import { connect } from 'node:net';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
 import { createWriteStream } from 'node:fs';
@@ -581,4 +582,93 @@ export async function startFrpTunnel({ port, frp = {}, home, signal, onPhase = (
     kill: proc.kill,
     onExit: proc.onExit,
   };
+}
+
+// ---------------------------------------------------------------------------
+// 自动探测与引导（向导式配置的最小必要信息）
+// ---------------------------------------------------------------------------
+
+/**
+ * 只读解析 ~/.cloudflared/config.yml 里的 ingress 域名（用户以前绑定的域名）。
+ * 绝不修改该文件——只读一行，把"用户已配好的域名"自动带出来，免手填。
+ */
+export async function readCloudflaredConfigHostname(credsDir) {
+  const dir = credsDir || join(homedir(), '.cloudflared');
+  let text;
+  try { text = await readFile(join(dir, 'config.yml'), 'utf8'); } catch { return null; }
+  const re = /^\s*-\s*hostname:\s*(\S+)\s*$/gm;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const host = m[1].trim();
+    if (host && host !== 'http_status:404') return host;
+  }
+  return null;
+}
+
+/** 归一化域名 → URL（裸域名补 https://）。 */
+function toUrl(host) {
+  if (!host) return null;
+  const h = String(host).trim();
+  if (!h) return null;
+  return /^https?:\/\//i.test(h) ? h : `https://${h}`;
+}
+
+/**
+ * 探测命名隧道路线的前置条件（设置页检测清单用，全部只读）。
+ * @returns {Promise<{hasCloudflared:boolean, hasCredentials:boolean, tunnels:Array, url:string|null}>}
+ */
+export async function detectNamedTunnelSetup(credsDir) {
+  const hasCloudflared = cloudflaredOnPath();
+  const tunnels = await listNamedTunnelCandidates(credsDir);
+  const host = await readCloudflaredConfigHostname(credsDir);
+  return {
+    hasCloudflared,
+    hasCredentials: tunnels.length > 0,
+    tunnels,
+    url: toUrl(host),
+  };
+}
+
+/**
+ * 一键生成 frps 服务器端配置（含随机 token，与 frpc 自动配对）。
+ * 用户在服务器上把内容保存为 frps.toml 并运行 frps -c frps.toml 即可。
+ */
+export function genFrpsConfig({ token, serverPort = 7000, vhostHttpPort = 80 } = {}) {
+  const lines = [
+    '# frps 服务器端配置（由 dsh-wdx-pocket 一键生成）',
+    '# 用法：保存为 frps.toml，然后在服务器上运行：frps -c frps.toml',
+    '',
+    `bindPort = ${Number(serverPort) || 7000}`,
+    'auth.method = "token"',
+    `auth.token = "${token}"`,
+    `vhostHTTPPort = ${Number(vhostHttpPort) || 80}`,
+    '',
+    '# 提示：vhostHTTPPort 默认 80（需要 root 权限运行 frps）。',
+    '# 若 80 被占用或不想用 root，可改成 8080 等高位端口，手机访问时带上端口即可。',
+  ];
+  return lines.join('\n') + '\n';
+}
+
+/**
+ * 探测 frp 服务器连通性（TCP 握手）。能连上 = frps 正在运行且端口可达。
+ * @returns {Promise<{ok:boolean, error?:string}>}
+ */
+export function testFrpServer(serverAddr, serverPort = 7000, timeoutMs = 5000) {
+  return new Promise((resolve) => {
+    const port = Number(serverPort) || 7000;
+    const sock = connect({ host: String(serverAddr || '').trim(), port });
+    const timer = setTimeout(() => {
+      sock.destroy();
+      resolve({ ok: false, error: `连接超时（${timeoutMs / 1000} 秒）。请确认：① 服务器 IP 正确；② 服务器上 frps 已在运行；③ 防火墙/云安全组已放行 ${port} 端口` });
+    }, timeoutMs);
+    sock.once('connect', () => {
+      clearTimeout(timer);
+      sock.destroy();
+      resolve({ ok: true });
+    });
+    sock.once('error', (err) => {
+      clearTimeout(timer);
+      resolve({ ok: false, error: `连接失败：${err?.code ?? err?.message ?? err}。请检查 IP 是否填对、frps 是否运行、防火墙/安全组是否放行 ${port} 端口` });
+    });
+  });
 }

@@ -5,6 +5,8 @@ export const POCKET_ENDPOINTS = Object.freeze({
   status: 'pocket.status',
   tunnelStart: 'tunnel.start',
   tunnelStop: 'tunnel.stop',
+  frpGenConfig: 'frp.genConfig',
+  frpTest: 'frp.test',
   version: 'pocket.version',
   update: 'pocket.update',
   restart: 'pocket.restart',
@@ -70,6 +72,7 @@ export function redactStatus(s) {
     namedConfig: s?.namedConfig ?? null,
     frpConfig: s?.frpConfig ?? null,
     namedCandidates: s?.namedCandidates ?? [],
+    detect: s?.detect ?? null,
     dshPort: s?.dshPort ?? null,
   };
 }

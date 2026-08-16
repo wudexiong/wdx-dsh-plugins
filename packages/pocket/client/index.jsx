@@ -27,6 +27,10 @@ const styles = {
   input: { font: 'inherit', width: '100%', boxSizing: 'border-box', border: '1px solid var(--dsw-alias-border-l2,#e5e7eb)', background: 'var(--dsw-alias-bg-layer-1,#fff)', color: 'inherit', borderRadius: 8, padding: '6px 10px', fontSize: 13, marginTop: 4 },
   label: { fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)' },
   select: { font: 'inherit', border: '1px solid var(--dsw-alias-border-l2,#e5e7eb)', background: 'var(--dsw-alias-bg-layer-1,#fff)', color: 'inherit', borderRadius: 8, padding: '6px 10px', fontSize: 13, marginTop: 4, width: '100%' },
+  routeCard: { border: '1px solid var(--dsw-alias-border-l2,#e5e7eb)', borderRadius: 10, padding: '10px 12px', marginTop: 8, cursor: 'pointer', background: 'var(--dsw-alias-bg-layer-1,#fff)' },
+  routeCardActive: { border: '1px solid var(--dsw-alias-brand-primary,#4f6ef7)', background: 'var(--dsw-alias-bg-layer-2,#f3f4f6)' },
+  checkOk: { color: 'var(--dsw-alias-state-success-primary,#16a34a)', fontSize: 12 },
+  checkBad: { color: 'var(--dsw-alias-state-error-primary,#dc2626)', fontSize: 12 },
 };
 
 function PocketSettingsTab({ rpcCall }) {
@@ -36,18 +40,15 @@ function PocketSettingsTab({ rpcCall }) {
   const [tunnelState, setTunnelState] = useState(null); // 隧道进度 {phase, detail, startedAt}
   const [restartNotice, setRestartNotice] = useState(false); // 重启后提示
   const [updateInfo, setUpdateInfo] = useState(null); // { current, latest, updating, result } | null
-  // 公网模式与配置表单（三模式可切换；配置持久化在 host 侧，重启不丢）
-  const [mode, setMode] = useState('quick');
-  const [modeTouched, setModeTouched] = useState(false); // 用户是否手动切过模式
-  const [namedTunnelName, setNamedTunnelName] = useState('');
-  const [namedCredsDir, setNamedCredsDir] = useState('');
-  const [namedUrl, setNamedUrl] = useState('');
+  // 公网向导状态：路线选择 + 最少必要信息（其余全部自动）
+  const [route, setRoute] = useState(null); // null | 'quick' | 'named' | 'frp'
+  const [namedTunnelName, setNamedTunnelName] = useState(''); // 自动探测预填
+  const [namedUrl, setNamedUrl] = useState(''); // 仅自动识别不到域名时需要填
   const [frpServerAddr, setFrpServerAddr] = useState('');
   const [frpServerPort, setFrpServerPort] = useState('7000');
-  const [frpToken, setFrpToken] = useState('');
-  const [frpCustomDomains, setFrpCustomDomains] = useState('');
-  const [frpRemotePort, setFrpRemotePort] = useState('');
-  const [frpFrpcPath, setFrpFrpcPath] = useState('');
+  const [frpGen, setFrpGen] = useState(null); // 一键生成的服务器配置 {toml, command}
+  const [frpTest, setFrpTest] = useState(null); // 连接测试结果 {ok, error}
+  const [frpTesting, setFrpTesting] = useState(false);
 
   const call = async (endpoint, payload) => {
     const res = await rpcCall(endpoint, payload);
@@ -147,22 +148,16 @@ function PocketSettingsTab({ rpcCall }) {
     setBusy(true);
     setError(null);
     setTunnelState({ phase: 'starting', detail: '正在开启…', startedAt: Date.now() });
-    // 按当前模式组装配置（host 会合并已保存配置并持久化）
+    // 按所选路线组装最少配置（host 会合并已保存配置并持久化；token 等 host 自动配对）
+    const detect = status?.detect;
+    const mode = route;
     const config = mode === 'named'
       ? {
-          tunnelName: namedTunnelName.trim(),
-          credsDir: namedCredsDir.trim() || undefined,
-          url: namedUrl.trim() || undefined,
+          tunnelName: (detect?.tunnels?.[0]?.name) || namedTunnelName.trim() || '',
+          url: (detect?.url) || namedUrl.trim() || undefined,
         }
       : mode === 'frp'
-        ? {
-            serverAddr: frpServerAddr.trim(),
-            serverPort: Number(frpServerPort) || 7000,
-            token: frpToken,
-            customDomains: frpCustomDomains.trim(),
-            remotePort: frpRemotePort ? Number(frpRemotePort) : undefined,
-            frpcPath: frpFrpcPath.trim() || undefined,
-          }
+        ? { serverAddr: frpServerAddr.trim(), serverPort: Number(frpServerPort) || 7000 }
         : undefined;
     try {
       setStatus(await call(POCKET_ENDPOINTS.tunnelStart, { mode, config }));
@@ -177,24 +172,39 @@ function PocketSettingsTab({ rpcCall }) {
     try { setStatus(await call(POCKET_ENDPOINTS.tunnelStop, {})); } catch { /* 忽略 */ }
   };
 
-  // 状态轮询回来时：同步模式与已保存配置（只在用户未手动改动时预填）
+  // 一键生成 frps 服务器配置（token 自动配对并保存在 host）
+  const genFrps = async () => {
+    try { setFrpGen(await call(POCKET_ENDPOINTS.frpGenConfig, {})); } catch (err) { setError(err.message); }
+  };
+
+  // 测试 frp 服务器连通性
+  const testFrp = async () => {
+    setFrpTesting(true);
+    setFrpTest(null);
+    try {
+      setFrpTest(await call(POCKET_ENDPOINTS.frpTest, {
+        config: { serverAddr: frpServerAddr.trim(), serverPort: Number(frpServerPort) || 7000 },
+      }));
+    } catch (err) {
+      setFrpTest({ ok: false, error: err.message });
+    } finally {
+      setFrpTesting(false);
+    }
+  };
+
+  // 状态轮询回来时：同步检测结果与已保存配置（只在未手动改动时预填）
   useEffect(() => {
     if (!status) return;
-    if (!modeTouched && status.tunnelMode) setMode(status.tunnelMode);
+    const detect = status.detect;
+    if (detect?.tunnels?.length) setNamedTunnelName((v) => v || detect.tunnels[0].name);
     if (status.namedConfig) {
       const c = status.namedConfig;
-      if (c.tunnelName) setNamedTunnelName(c.tunnelName);
-      if (c.credsDir) setNamedCredsDir(c.credsDir);
-      if (c.url) setNamedUrl(c.url);
+      if (c.url) setNamedUrl((v) => v || c.url);
     }
     if (status.frpConfig) {
       const c = status.frpConfig;
-      if (c.serverAddr) setFrpServerAddr(c.serverAddr);
-      if (c.serverPort) setFrpServerPort(String(c.serverPort));
-      if (c.customDomains) setFrpCustomDomains(c.customDomains);
-      if (c.remotePort) setFrpRemotePort(String(c.remotePort));
-      if (c.frpcPath) setFrpFrpcPath(c.frpcPath);
-      // token 被掩码为 ***，不回填；用户重填或留空（留空表示沿用已保存的）
+      if (c.serverAddr) setFrpServerAddr((v) => v || c.serverAddr);
+      if (c.serverPort) setFrpServerPort((v) => v || String(c.serverPort));
     }
   }, [status]);
 
@@ -273,46 +283,68 @@ function PocketSettingsTab({ rpcCall }) {
           h('button', { style: styles.btn, onClick: stopTunnel }, '关闭公网 | Stop'),
         )
         : h('div', null,
-          // 模式选择
-          h('div', { style: { marginTop: 8 } },
-            h('div', { style: styles.label }, '公网方式 | Tunnel mode'),
-            h('select', {
-              value: mode,
-              onChange: (e) => { setMode(e.target.value); setModeTouched(true); },
-              style: styles.select,
-            }, (status?.tunnelModes ?? POCKET_TUNNEL_MODES).map((m) =>
-              h('option', { key: m, value: m }, POCKET_TUNNEL_MODE_LABELS[m] ?? m))),
+          h('div', { style: styles.muted },
+            '原理：你的电脑没有公网 IP，手机在外面连不上。穿透 = 找一个「中转站」：电脑主动连上它，手机访问它，它把请求转给你电脑。选一条路即可：| How it works: your PC has no public IP — pick a relay route:'),
+          // 路线卡片（自己选，不做推荐）
+          h('div', { style: { ...styles.routeCard, ...(route === 'quick' ? styles.routeCardActive : {}) }, onClick: () => setRoute('quick') },
+            h('div', { style: { fontWeight: 600, fontSize: 13 } }, '🚀 快速隧道 | Quick tunnel'),
+            h('div', { style: styles.muted, marginTop: 2 }, '什么都不用准备，点开启就能用；缺点：国内网络可能打不开 | zero setup; may be blocked in mainland China'),
           ),
-          // 命名隧道配置表单（自动探测 ~/.cloudflared 凭据作候选）
-          mode === 'named' ? h('div', { style: { marginTop: 8 } },
-            h('div', { style: styles.label }, '隧道名 | Tunnel name'),
-            h('input', { style: styles.input, value: namedTunnelName, onChange: (e) => setNamedTunnelName(e.target.value), placeholder: 'live-tunnel', list: 'wdx-named-candidates' }),
-            status?.namedCandidates?.length
-              ? h('datalist', { id: 'wdx-named-candidates' }, status.namedCandidates.map((c) => h('option', { key: c.name, value: c.name }, `${c.name}（${c.id.slice(0, 8)}…）`)))
-              : null,
-            h('div', { style: { ...styles.label, marginTop: 8 } }, '凭据目录（默认 ~/.cloudflared）| Credentials dir'),
-            h('input', { style: styles.input, value: namedCredsDir, onChange: (e) => setNamedCredsDir(e.target.value), placeholder: 'C:\\Users\\you\\.cloudflared' }),
-            h('div', { style: { ...styles.label, marginTop: 8 } }, '公网 URL（二维码内容）| Public URL'),
-            h('input', { style: styles.input, value: namedUrl, onChange: (e) => setNamedUrl(e.target.value), placeholder: 'https://live.example.com' }),
-            h('div', { style: styles.muted, marginTop: 6 }, '只读引用你的 cloudflared 凭据，绝不修改原有配置 | reads your cloudflared credentials only, never modifies your configs'),
+          h('div', { style: { ...styles.routeCard, ...(route === 'named' ? styles.routeCardActive : {}) }, onClick: () => setRoute('named') },
+            h('div', { style: { fontWeight: 600, fontSize: 13 } }, '🌐 Cloudflare 隧道 | Named tunnel'),
+            h('div', { style: styles.muted, marginTop: 2 }, '用自己的域名走 Cloudflare 免费中转；国内能不能通看运气 | your own domain via Cloudflare; China access not guaranteed'),
+          ),
+          h('div', { style: { ...styles.routeCard, ...(route === 'frp' ? styles.routeCardActive : {}) }, onClick: () => setRoute('frp') },
+            h('div', { style: { fontWeight: 600, fontSize: 13 } }, '🖥 自己的服务器 | Your server'),
+            h('div', { style: styles.muted, marginTop: 2 }, '最稳，国内全链路直连；需要一台有公网 IP 的服务器（几十块/年那种就行）| most stable; needs a cheap VPS'),
+          ),
+          // ---- 路线内容：快速隧道（0 填写）----
+          route === 'quick' ? h('div', { style: { marginTop: 10 } },
+            h('div', { style: styles.muted }, '免费中转，URL 每次开启自动换新（适合临时用/测试）| free relay, URL rotates each start'),
+            h('button', { style: { ...styles.primary, marginTop: 10 }, onClick: startTunnel, disabled: busy || tunnelStarting }, busy ? '开启中…' : '开启公网访问 | Enable'),
           ) : null,
-          // frp 配置表单
-          mode === 'frp' ? h('div', { style: { marginTop: 8 } },
-            h('div', { style: styles.label }, '服务器地址 | Server address'),
+          // ---- 路线内容：Cloudflare 隧道（全自动检测，0~1 填写）----
+          route === 'named' ? h('div', { style: { marginTop: 10 } },
+            h('div', { style: styles.label }, '自动检测 | Auto-detected'),
+            h('div', { style: { marginTop: 4 } },
+              h('div', { style: detect?.hasCloudflared ? styles.checkOk : styles.checkBad },
+                `${detect?.hasCloudflared ? '✅' : '❌'} 电脑已安装 cloudflared${detect?.hasCloudflared ? '' : '（安装：npm i -g cloudflared，或 winget install cloudflared）'}`),
+              h('div', { style: { ...(detect?.hasCredentials ? styles.checkOk : styles.checkBad), marginTop: 2 } },
+                `${detect?.hasCredentials ? '✅' : '❌'} 找到命名隧道${detect?.hasCredentials ? `：${detect.tunnels.map((t) => t.name).join('、')}` : '（创建：cloudflared tunnel create 隧道名）'}`),
+              h('div', { style: { ...(detect?.url ? styles.checkOk : styles.checkBad), marginTop: 2 } },
+                `${detect?.url ? '✅' : '❌'} 识别到你的域名${detect?.url ? `：${detect.url}` : '（即绑定在隧道上的域名，Cloudflare 面板 DNS 里能看到）'}`),
+            ),
+            detect?.url ? null : h('div', { style: { marginTop: 8 } },
+              h('div', { style: styles.label }, '你的域名（二维码内容）| Your domain'),
+              h('input', { style: styles.input, value: namedUrl, onChange: (e) => setNamedUrl(e.target.value), placeholder: 'https://live.example.com' }),
+            ),
+            h('div', { style: styles.muted, marginTop: 6 }, '以上全部自动识别（只读你的 cloudflared 配置，绝不修改）| all auto-detected, read-only'),
+            h('button', { style: { ...styles.primary, marginTop: 10 }, onClick: startTunnel, disabled: busy || tunnelStarting || !(detect?.hasCredentials || namedUrl.trim()) }, busy ? '开启中…' : '开启公网访问 | Enable'),
+          ) : null,
+          // ---- 路线内容：自己的服务器（填 1 个 IP + 一键生成服务器配置）----
+          route === 'frp' ? h('div', { style: { marginTop: 10 } },
+            h('div', { style: styles.label }, '服务器 IP（必填）| Server IP'),
             h('input', { style: styles.input, value: frpServerAddr, onChange: (e) => setFrpServerAddr(e.target.value), placeholder: '123.45.67.89' }),
-            h('div', { style: { ...styles.label, marginTop: 8 } }, '服务器端口 | Server port'),
-            h('input', { style: styles.input, value: frpServerPort, onChange: (e) => setFrpServerPort(e.target.value), placeholder: '7000' }),
-            h('div', { style: { ...styles.label, marginTop: 8 } }, '认证 token | Auth token'),
-            h('input', { style: styles.input, type: 'password', value: frpToken, onChange: (e) => setFrpToken(e.target.value), placeholder: '已保存则留空 | leave blank if saved' }),
-            h('div', { style: { ...styles.label, marginTop: 8 } }, '自定义域名（逗号分隔，可选）| Custom domains'),
-            h('input', { style: styles.input, value: frpCustomDomains, onChange: (e) => setFrpCustomDomains(e.target.value), placeholder: 'm.example.com' }),
-            h('div', { style: { ...styles.label, marginTop: 8 } }, '远程端口（可选）| Remote port'),
-            h('input', { style: styles.input, value: frpRemotePort, onChange: (e) => setFrpRemotePort(e.target.value), placeholder: '80 / 443 / 8443' }),
-            h('div', { style: { ...styles.label, marginTop: 8 } }, 'frpc 路径（可选，默认自动下载）| frpc path'),
-            h('input', { style: styles.input, value: frpFrpcPath, onChange: (e) => setFrpFrpcPath(e.target.value), placeholder: 'frpc.exe 绝对路径' }),
-            h('div', { style: styles.muted, marginTop: 6 }, 'frp 需服务器端 frps 已运行；配置写入 $DSH_HOME/dsh-wdx-pocket/，不动你的 frpc 配置 | frps must run on your server; config goes to $DSH_HOME/dsh-wdx-pocket/'),
+            h('div', { style: styles.muted, marginTop: 4 }, '就是你云服务器控制台显示的「公网 IP」（买服务器那家的控制台里能看到）| the public IP shown in your cloud console'),
+            h('div', { style: { marginTop: 8 } },
+              frpGen
+                ? h('div', null,
+                    h('div', { style: styles.label }, '① 把下面内容保存到服务器（文件名 frps.toml）| save on your server as frps.toml'),
+                    h('pre', { style: { ...styles.code, background: 'var(--dsw-alias-bg-layer-2,#f3f4f6)', padding: 8, borderRadius: 8, whiteSpace: 'pre-wrap', maxHeight: 160, overflow: 'auto', marginTop: 4 } }, frpGen.toml),
+                    h('div', { style: { ...styles.label, marginTop: 8 } }, '② 在服务器上运行（服务器需装有 frps；下载 frp 解压即得）| run on your server'),
+                    h('div', { style: styles.code }, frpGen.command),
+                    h('div', { style: styles.muted, marginTop: 4 }, 'token 已自动配对，本机无需填写 | token auto-paired, nothing to fill here'),
+                  )
+                : h('button', { style: styles.btn, onClick: genFrps }, '① 生成服务器配置 | Generate server config'),
+            ),
+            h('div', { style: { marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' } },
+              h('button', { style: styles.btn, onClick: testFrp, disabled: frpTesting || !frpServerAddr.trim() }, frpTesting ? '测试中…' : '② 测试连接 | Test'),
+              h('button', { style: styles.primary, onClick: startTunnel, disabled: busy || tunnelStarting || !frpServerAddr.trim() }, busy ? '开启中…' : '③ 开启公网访问 | Enable'),
+            ),
+            frpTest ? h('div', { style: { marginTop: 6, fontSize: 12, color: frpTest.ok ? 'var(--dsw-alias-state-success-primary,#16a34a)' : 'var(--dsw-alias-state-error-primary,#dc2626)' } },
+              frpTest.ok ? '✅ 服务器连接成功，可以开启了' : `❌ ${frpTest.error}`,
+            ) : null,
           ) : null,
-          h('button', { style: { ...styles.primary, marginTop: 12 }, onClick: startTunnel, disabled: busy || tunnelStarting }, busy ? '开启中…' : '开启公网访问 | Enable anywhere'),
           tunnelStarting
             ? h('div', { style: { marginTop: 8, fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)' } },
               `⏳ ${tunnelStateDetail}（已等待 ${Math.floor((Date.now() - (tunnelStateStarted || Date.now())) / 1000)} 秒）…`)

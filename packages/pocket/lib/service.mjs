@@ -11,12 +11,16 @@ import { networkInterfaces, homedir } from 'node:os';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
 import { createPocketProxy } from './proxy.mjs';
 import {
   startQuickTunnel,
   startNamedTunnel,
   startFrpTunnel,
   listNamedTunnelCandidates,
+  detectNamedTunnelSetup,
+  genFrpsConfig,
+  testFrpServer,
   pocketDir,
 } from './tunnel.mjs';
 
@@ -236,8 +240,44 @@ export function createPocketService({
         namedConfig: maskedConfig(saved.named),
         frpConfig: maskedConfig(saved.frp),
         namedCandidates: await listNamedTunnelCandidates().catch(() => []),
+        // 向导检测清单（全部只读探测，供设置页打勾展示）
+        detect: await detectNamedTunnelSetup().catch(() => ({
+          hasCloudflared: false, hasCredentials: false, tunnels: [], url: null,
+        })),
         dshPort,
       };
+    },
+
+    /**
+     * 一键生成 frps 服务器配置（随机 token 自动配对，token 持久化供 frpc 使用）。
+     * @returns {Promise<{toml:string, command:string, serverPort:number, tokenMasked:string}>}
+     */
+    async genFrpsConfig() {
+      const saved = await getSavedConfig();
+      const frp = saved.frp ?? {};
+      const token = frp.token && frp.token !== '***' ? frp.token : randomBytes(16).toString('hex');
+      const serverPort = Number(frp.serverPort) || 7000;
+      const toml = genFrpsConfig({ token, serverPort });
+      const next = { ...saved, frp: { ...frp, token, serverPort } };
+      savedConfig = next;
+      await saveConfig(home, next);
+      return {
+        toml,
+        command: 'frps -c frps.toml',
+        serverPort,
+        tokenMasked: token.slice(0, 4) + '…',
+      };
+    },
+
+    /**
+     * 测试 frp 服务器连通性（TCP 握手）。
+     * @param {object} config { serverAddr, serverPort }
+     * @returns {Promise<{ok:boolean, error?:string}>}
+     */
+    async testFrpServer(config = {}) {
+      const saved = await getSavedConfig();
+      const merged = { ...(saved.frp ?? {}), ...config };
+      return testFrpServer(merged.serverAddr, merged.serverPort);
     },
 
     /** 停止一切（插件卸载时）。 */
