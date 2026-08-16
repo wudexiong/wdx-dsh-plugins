@@ -43,36 +43,51 @@ TMP_TGZ="/tmp/${ASSET}"
 FRPS_BIN="${DEST}/frps"
 
 MIRRORS=(
-  "https://github.com/fatedier/frp/releases/download/${ASSET}"
-  "https://ghfast.top/https://github.com/fatedier/frp/releases/download/${ASSET}"
+  "https://gh.ddlc.top/https://github.com/fatedier/frp/releases/download/${ASSET}"
   "https://gh-proxy.com/https://github.com/fatedier/frp/releases/download/${ASSET}"
   "https://mirror.ghproxy.com/https://github.com/fatedier/frp/releases/download/${ASSET}"
+  "https://github.com/fatedier/frp/releases/download/${ASSET}"
+  "https://ghfast.top/https://github.com/fatedier/frp/releases/download/${ASSET}"
+  "https://ghproxy.net/https://github.com/fatedier/frp/releases/download/${ASSET}"
 )
 
 download() {
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL --connect-timeout 15 --max-time 180 -o "$1" "$2"
+    curl -fsSL --connect-timeout 20 --max-time 300 -o "$1" "$2"
   elif command -v wget >/dev/null 2>&1; then
-    wget -q --timeout=180 -O "$1" "$2"
+    wget -q --timeout=300 -O "$1" "$2"
   else
     echo "❌ 服务器上没有 curl/wget，请先安装：apt install -y curl 或 yum install -y curl"; exit 1
   fi
 }
 
-echo "==> 下载 frp ${VER} (${OS}/${A})…"
-OK=0
-for m in "${MIRRORS[@]}"; do
-  if download "$TMP_TGZ" "$m" 2>/dev/null; then OK=1; break; fi
-  echo "   ⚠️ 镜像失败，尝试下一个…"
-done
-if [ "$OK" != "1" ]; then echo "❌ 所有镜像都下载失败，请手动下载 frp 后重试"; exit 1; fi
+# ---------- 2.1 已安装则跳过下载（重试不重复下载） ----------
+if [ -x "$FRPS_BIN" ]; then
+  echo "==> 检测到已安装的 frps（${FRPS_BIN}），跳过下载"
+else
+  echo "==> 下载 frp ${VER} (${OS}/${A})…"
+  OK=0
+  for m in "${MIRRORS[@]}"; do
+    echo "   ⏳ 尝试源：$(echo "$m" | sed -E 's#https://([^/]+)/.*#\1#')"
+    if download "$TMP_TGZ" "$m" 2>/dev/null; then OK=1; break; fi
+    echo "   ⚠️ 失败，尝试下一个…"
+  done
+  if [ "$OK" != "1" ]; then
+    echo "❌ 所有镜像都下载失败。手动安装方法（任选其一）："
+    echo "   ① 在有网络的电脑上下载：https://github.com/fatedier/frp/releases/download/v${VER}/frp_${VER}_${OS}_${A}.tar.gz"
+    echo "      （国内可用加速镜像：https://gh.ddlc.top/https://github.com/fatedier/frp/releases/download/v${VER}/frp_${VER}_${OS}_${A}.tar.gz）"
+    echo "      然后上传到服务器并解压：tar -xzf frp_${VER}_${OS}_${A}.tar.gz && cp frp_${VER}_${OS}_${A}/frps /opt/frp/frps && chmod +x /opt/frp/frps && 重新执行本脚本"
+    echo "   ② 或开启服务器代理后重试本脚本"
+    exit 1
+  fi
 
-# ---------- 3. 解压安装 ----------
-echo "==> 安装到 ${DEST}"
-mkdir -p "$DEST"
-tar -xzf "$TMP_TGZ" -C "$DEST" --strip-components=1 "frp_${VER}_${OS}_${A}/frps"
-rm -f "$TMP_TGZ"
-chmod +x "$FRPS_BIN"
+  # ---------- 3. 解压安装 ----------
+  echo "==> 安装到 ${DEST}"
+  mkdir -p "$DEST"
+  tar -xzf "$TMP_TGZ" -C "$DEST" --strip-components=1 "frp_${VER}_${OS}_${A}/frps"
+  rm -f "$TMP_TGZ"
+  chmod +x "$FRPS_BIN"
+fi
 
 # ---------- 4. 写入 frps.toml ----------
 cat > "${DEST}/frps.toml" <<EOF
