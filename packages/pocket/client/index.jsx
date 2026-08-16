@@ -120,14 +120,27 @@ function PublicRoutePanel({
           h('div', { style: { marginTop: 8 } },
             frpGen
               ? h('div', null,
-                h('div', { style: styles.label }, '① 复制下面这一行命令 | copy this one-liner'),
-                h('pre', { style: { ...styles.code, background: 'var(--dsw-alias-bg-layer-2,#f3f4f6)', padding: 8, borderRadius: 8, whiteSpace: 'pre-wrap', maxHeight: 120, overflow: 'auto', marginTop: 4 } }, frpGen.command),
-                h('div', { style: styles.muted, marginTop: 4 },
-                  '② SSH 登录你的服务器，粘贴运行。脚本会自动：下载 frp → 装成系统服务 → 开机自启 → 放行端口。③ 回到这里点「测试连接」| ssh to your server and run it — the script auto-installs frps as a systemd service. Then click Test'),
-                h('div', { style: styles.muted, marginTop: 4 },
-                  '国内下载失败？把命令里的 raw.githubusercontent.com 前面加 ghfast.top/ 再试 | mirror: prefix ghfast.top/ to the raw URL if download fails'),
+                // 方式切换：完整脚本（推荐，不依赖服务器网络） / 一行命令
+                h('div', { style: { display: 'flex', gap: 8, marginBottom: 6 } },
+                  h('button', { style: frpCopyMode === 'script' ? styles.primary : styles.btn, onClick: () => setFrpCopyMode('script') }, '📋 完整脚本（推荐）'),
+                  h('button', { style: frpCopyMode === 'command' ? styles.primary : styles.btn, onClick: () => setFrpCopyMode('command') }, '⚡ 一行命令'),
+                ),
+                frpCopyMode === 'script' && frpGen.script
+                  ? h('div', null,
+                    h('div', { style: styles.muted },
+                      '① 点「一键复制」→ ② SSH 登录服务器执行 `cat > /opt/frp-setup.sh` 回车 → ③ 粘贴内容 → ④ 按 Ctrl+D 保存 → ⑤ 执行 `bash /opt/frp-setup.sh`（参数已内嵌，无需再填）| copy → cat > /opt/frp-setup.sh → paste → Ctrl+D → bash /opt/frp-setup.sh'),
+                    h('pre', { style: { ...styles.code, background: 'var(--dsw-alias-bg-layer-2,#f3f4f6)', padding: 8, borderRadius: 8, whiteSpace: 'pre-wrap', maxHeight: 240, overflow: 'auto', marginTop: 6 } }, frpGen.script),
+                    h('button', { style: { ...styles.primary, marginTop: 6 }, onClick: () => copyText(frpGen.script) }, frpCopied ? '✅ 已复制！' : '📋 一键复制完整脚本 | Copy script'),
+                  )
+                  : h('div', null,
+                    h('div', { style: styles.muted }, '服务器能访问 GitHub 时可用：SSH 登录后粘贴这一行 | if your server can reach GitHub, paste this one-liner'),
+                    h('pre', { style: { ...styles.code, background: 'var(--dsw-alias-bg-layer-2,#f3f4f6)', padding: 8, borderRadius: 8, whiteSpace: 'pre-wrap', maxHeight: 120, overflow: 'auto', marginTop: 6 } }, frpGen.command),
+                    h('button', { style: { ...styles.primary, marginTop: 6 }, onClick: () => copyText(frpGen.command) }, frpCopied ? '✅ 已复制！' : '📋 复制命令 | Copy command'),
+                  ),
+                h('div', { style: styles.muted, marginTop: 6 },
+                  '脚本自动：下载 frp → 装成系统服务 → 开机自启 → 放行端口（自动适配普通/宝塔/Docker 环境）；完成后回来点「测试连接」| auto: download frp → systemd → firewall → env-aware; then click Test'),
               )
-              : h('button', { style: styles.btn, onClick: genFrps }, '① 生成部署命令 | Generate one-liner'),
+              : h('button', { style: styles.btn, onClick: genFrps }, '① 生成部署内容 | Generate'),
           ),
           h('div', { style: { marginTop: 8 } },
             h('div', { style: styles.label }, '你的域名/子域名（可选）| Your subdomain (optional)'),
@@ -172,9 +185,11 @@ function PocketSettingsTab({ rpcCall }) {
   const [frpServerPort, setFrpServerPort] = useState('7000');
   const [frpCustomDomains, setFrpCustomDomains] = useState(''); // 可选：自己的子域名
   const [frpVhostPort, setFrpVhostPort] = useState('9527'); // 手机访问端口（固定默认，用户可改）
-  const [frpGen, setFrpGen] = useState(null); // 一键生成的部署信息 {command, ...}
+  const [frpGen, setFrpGen] = useState(null); // 一键生成的部署信息 {script, command, ...}
   const [frpTest, setFrpTest] = useState(null); // 连接测试结果 {ok, error}
   const [frpTesting, setFrpTesting] = useState(false);
+  const [frpCopyMode, setFrpCopyMode] = useState('script'); // 展示方式：完整脚本 / 一行命令
+  const [frpCopied, setFrpCopied] = useState(false); // 复制成功反馈
 
   const call = async (endpoint, payload) => {
     const res = await rpcCall(endpoint, payload);
@@ -313,7 +328,28 @@ function PocketSettingsTab({ rpcCall }) {
           customDomains: frpCustomDomains.trim() || undefined,
         },
       }));
+      setFrpCopied(false);
     } catch (err) { setError(err.message); }
+  };
+
+  // 一键复制到剪贴板（clipboard API + 降级方案）
+  const copyText = async (text) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setFrpCopied(true);
+      setTimeout(() => setFrpCopied(false), 2000);
+    } catch { /* 复制失败静默 */ }
   };
 
   // 测试 frp 服务器连通性

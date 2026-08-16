@@ -11,6 +11,7 @@ import {
   detectNamedTunnelSetup,
   genFrpsConfig,
   frpsSetupCommand,
+  frpsSetupScript,
   testFrpServer,
 } from '../lib/tunnel.mjs';
 
@@ -60,6 +61,19 @@ test('genFrpsConfig / frpsSetupCommand：固定默认端口 9527 + 子域名参�
 
   const cmdSub = frpsSetupCommand({ token: 't', vhostPort: 9527, bindPort: 7000, subdomain: 'm.example.com' });
   assert.ok(cmdSub.endsWith('m.example.com'), '子域名作为第 4 个参数追加');
+});
+
+test('frpsSetupScript：完整脚本参数内嵌（token/端口/子域名写死，用户粘贴即可跑）', async () => {
+  const script = await frpsSetupScript({
+    token: 'tok123', vhostPort: 9527, bindPort: 7000, subdomain: 'm.example.com',
+  });
+  assert.ok(script, '脚本模板可读');
+  assert.ok(script.includes('TOKEN="tok123"'), 'token 内嵌');
+  assert.ok(script.includes('VHOST="9527"'), '访问端口内嵌');
+  assert.ok(script.includes('BIND="7000"'), '通信端口内嵌');
+  assert.ok(script.includes('SUB="m.example.com"'), '子域名内嵌');
+  assert.ok(!script.includes('${1:'), '不再有必填参数占位（无需带参执行）');
+  assert.ok(script.includes('frps 部署开始'), '保留脚本主体');
 });
 
 test('testFrpServer：不可达地址返回 ok:false 与中文提示（立即失败不挂起）', async () => {

@@ -656,6 +656,39 @@ export function frpsSetupCommand({ token, vhostPort, bindPort = 7000, subdomain 
   return `curl -fsSL ${FRPS_SETUP_SCRIPT_URL} | bash -s -- ${token} ${vhost} ${bind}${sub}`;
 }
 
+/** 部署脚本模板（包内 deploy/frps-setup.sh，随 npm 包发布）。 */
+const FRPS_SETUP_SCRIPT_TEMPLATE = new URL('../deploy/frps-setup.sh', import.meta.url);
+
+/** 读取 frps 部署脚本模板全文（服务器无法在线拉取时，用户复制粘贴用）。 */
+export async function readFrpsSetupScript() {
+  try {
+    return await readFile(FRPS_SETUP_SCRIPT_TEMPLATE, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 生成"参数已内嵌"的完整部署脚本：TOKEN/VHOST/BIND/SUB 直接写死在脚本里，
+ * 用户复制全文粘贴到服务器后直接 `bash frps-setup.sh` 即可，无需带参数。
+ * @returns {Promise<string|null>}
+ */
+export async function frpsSetupScript({ token, vhostPort, bindPort = 7000, subdomain } = {}) {
+  const tpl = await readFrpsSetupScript();
+  if (!tpl) return null;
+  const vhost = Number(vhostPort) > 0 ? Number(vhostPort) : DEFAULT_VHOST_PORT;
+  const bind = Number(bindPort) || 7000;
+  const sub = subdomain && String(subdomain).trim() ? String(subdomain).trim() : '';
+  return tpl.split('\n').map((line) => {
+    if (/^(TOKEN|VHOST|BIND|SUB)="/.test(line)) {
+      const key = line.slice(0, line.indexOf('='));
+      const val = key === 'TOKEN' ? String(token ?? '') : key === 'VHOST' ? String(vhost) : key === 'BIND' ? String(bind) : sub;
+      return `${key}="${val}"`;
+    }
+    return line;
+  }).join('\n');
+}
+
 /**
  * 探测 frp 服务器连通性（TCP 握手）。能连上 = frps 正在运行且端口可达。
  * @returns {Promise<{ok:boolean, error?:string}>}

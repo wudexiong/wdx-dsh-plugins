@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "dsh-wdx-pocket",
-  "description": "wdx Pocket —— 将 DeepSeek Harness 装进口袋：手机扫码即同步访问电脑上的 DSH（局域网 + 公网多模式，实时同屏，移动端适配）。基于 dsh-wdx-pocket 二次开发（GPL-2.0，版权声明保留）。",
+  "description": "wdx Pocket 鈥斺€?灏?DeepSeek Harness 瑁呰繘鍙ｈ锛氭墜鏈烘壂鐮佸嵆鍚屾璁块棶鐢佃剳涓婄殑 DSH锛堝眬鍩熺綉 + 鍏綉澶氭ā寮忥紝瀹炴椂鍚屽睆锛岀Щ鍔ㄧ閫傞厤锛夈€傚熀浜?dsh-wdx-pocket 浜屾寮€鍙戯紙GPL-2.0锛岀増鏉冨０鏄庝繚鐣欙級銆?,
   "type": "module",
   "main": "lib/index.js",
   "bin": {
@@ -17,6 +17,7 @@
     "bin",
     "lib",
     "client",
+    "deploy",
     "cordis.patch.yml",
     "README.md",
     "LICENSE"
@@ -80,5 +81,5 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "version": "0.3.0"
+  "version": "0.3.1"
 }

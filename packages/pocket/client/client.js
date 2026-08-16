@@ -1461,19 +1461,36 @@ function PublicRoutePanel({
           frpGen ? (0, import_react2.createElement)(
             "div",
             null,
-            (0, import_react2.createElement)("div", { style: styles.label }, "\u2460 \u590D\u5236\u4E0B\u9762\u8FD9\u4E00\u884C\u547D\u4EE4 | copy this one-liner"),
-            (0, import_react2.createElement)("pre", { style: { ...styles.code, background: "var(--dsw-alias-bg-layer-2,#f3f4f6)", padding: 8, borderRadius: 8, whiteSpace: "pre-wrap", maxHeight: 120, overflow: "auto", marginTop: 4 } }, frpGen.command),
+            // 方式切换：完整脚本（推荐，不依赖服务器网络） / 一行命令
             (0, import_react2.createElement)(
               "div",
-              { style: styles.muted, marginTop: 4 },
-              "\u2461 SSH \u767B\u5F55\u4F60\u7684\u670D\u52A1\u5668\uFF0C\u7C98\u8D34\u8FD0\u884C\u3002\u811A\u672C\u4F1A\u81EA\u52A8\uFF1A\u4E0B\u8F7D frp \u2192 \u88C5\u6210\u7CFB\u7EDF\u670D\u52A1 \u2192 \u5F00\u673A\u81EA\u542F \u2192 \u653E\u884C\u7AEF\u53E3\u3002\u2462 \u56DE\u5230\u8FD9\u91CC\u70B9\u300C\u6D4B\u8BD5\u8FDE\u63A5\u300D| ssh to your server and run it \u2014 the script auto-installs frps as a systemd service. Then click Test"
+              { style: { display: "flex", gap: 8, marginBottom: 6 } },
+              (0, import_react2.createElement)("button", { style: frpCopyMode === "script" ? styles.primary : styles.btn, onClick: () => setFrpCopyMode("script") }, "\u{1F4CB} \u5B8C\u6574\u811A\u672C\uFF08\u63A8\u8350\uFF09"),
+              (0, import_react2.createElement)("button", { style: frpCopyMode === "command" ? styles.primary : styles.btn, onClick: () => setFrpCopyMode("command") }, "\u26A1 \u4E00\u884C\u547D\u4EE4")
+            ),
+            frpCopyMode === "script" && frpGen.script ? (0, import_react2.createElement)(
+              "div",
+              null,
+              (0, import_react2.createElement)(
+                "div",
+                { style: styles.muted },
+                "\u2460 \u70B9\u300C\u4E00\u952E\u590D\u5236\u300D\u2192 \u2461 SSH \u767B\u5F55\u670D\u52A1\u5668\u6267\u884C `cat > /opt/frp-setup.sh` \u56DE\u8F66 \u2192 \u2462 \u7C98\u8D34\u5185\u5BB9 \u2192 \u2463 \u6309 Ctrl+D \u4FDD\u5B58 \u2192 \u2464 \u6267\u884C `bash /opt/frp-setup.sh`\uFF08\u53C2\u6570\u5DF2\u5185\u5D4C\uFF0C\u65E0\u9700\u518D\u586B\uFF09| copy \u2192 cat > /opt/frp-setup.sh \u2192 paste \u2192 Ctrl+D \u2192 bash /opt/frp-setup.sh"
+              ),
+              (0, import_react2.createElement)("pre", { style: { ...styles.code, background: "var(--dsw-alias-bg-layer-2,#f3f4f6)", padding: 8, borderRadius: 8, whiteSpace: "pre-wrap", maxHeight: 240, overflow: "auto", marginTop: 6 } }, frpGen.script),
+              (0, import_react2.createElement)("button", { style: { ...styles.primary, marginTop: 6 }, onClick: () => copyText(frpGen.script) }, frpCopied ? "\u2705 \u5DF2\u590D\u5236\uFF01" : "\u{1F4CB} \u4E00\u952E\u590D\u5236\u5B8C\u6574\u811A\u672C | Copy script")
+            ) : (0, import_react2.createElement)(
+              "div",
+              null,
+              (0, import_react2.createElement)("div", { style: styles.muted }, "\u670D\u52A1\u5668\u80FD\u8BBF\u95EE GitHub \u65F6\u53EF\u7528\uFF1ASSH \u767B\u5F55\u540E\u7C98\u8D34\u8FD9\u4E00\u884C | if your server can reach GitHub, paste this one-liner"),
+              (0, import_react2.createElement)("pre", { style: { ...styles.code, background: "var(--dsw-alias-bg-layer-2,#f3f4f6)", padding: 8, borderRadius: 8, whiteSpace: "pre-wrap", maxHeight: 120, overflow: "auto", marginTop: 6 } }, frpGen.command),
+              (0, import_react2.createElement)("button", { style: { ...styles.primary, marginTop: 6 }, onClick: () => copyText(frpGen.command) }, frpCopied ? "\u2705 \u5DF2\u590D\u5236\uFF01" : "\u{1F4CB} \u590D\u5236\u547D\u4EE4 | Copy command")
             ),
             (0, import_react2.createElement)(
               "div",
-              { style: styles.muted, marginTop: 4 },
-              "\u56FD\u5185\u4E0B\u8F7D\u5931\u8D25\uFF1F\u628A\u547D\u4EE4\u91CC\u7684 raw.githubusercontent.com \u524D\u9762\u52A0 ghfast.top/ \u518D\u8BD5 | mirror: prefix ghfast.top/ to the raw URL if download fails"
+              { style: styles.muted, marginTop: 6 },
+              "\u811A\u672C\u81EA\u52A8\uFF1A\u4E0B\u8F7D frp \u2192 \u88C5\u6210\u7CFB\u7EDF\u670D\u52A1 \u2192 \u5F00\u673A\u81EA\u542F \u2192 \u653E\u884C\u7AEF\u53E3\uFF08\u81EA\u52A8\u9002\u914D\u666E\u901A/\u5B9D\u5854/Docker \u73AF\u5883\uFF09\uFF1B\u5B8C\u6210\u540E\u56DE\u6765\u70B9\u300C\u6D4B\u8BD5\u8FDE\u63A5\u300D| auto: download frp \u2192 systemd \u2192 firewall \u2192 env-aware; then click Test"
             )
-          ) : (0, import_react2.createElement)("button", { style: styles.btn, onClick: genFrps }, "\u2460 \u751F\u6210\u90E8\u7F72\u547D\u4EE4 | Generate one-liner")
+          ) : (0, import_react2.createElement)("button", { style: styles.btn, onClick: genFrps }, "\u2460 \u751F\u6210\u90E8\u7F72\u5185\u5BB9 | Generate")
         ),
         (0, import_react2.createElement)(
           "div",
@@ -1532,6 +1549,8 @@ function PocketSettingsTab({ rpcCall }) {
   const [frpGen, setFrpGen] = (0, import_react2.useState)(null);
   const [frpTest, setFrpTest] = (0, import_react2.useState)(null);
   const [frpTesting, setFrpTesting] = (0, import_react2.useState)(false);
+  const [frpCopyMode2, setFrpCopyMode2] = (0, import_react2.useState)("script");
+  const [frpCopied2, setFrpCopied] = (0, import_react2.useState)(false);
   const call = async (endpoint, payload) => {
     const res = await rpcCall(endpoint, payload);
     if (!res?.ok) throw new Error(res?.error?.message ?? "RPC failed");
@@ -1659,8 +1678,28 @@ function PocketSettingsTab({ rpcCall }) {
           customDomains: frpCustomDomains.trim() || void 0
         }
       }));
+      setFrpCopied(false);
     } catch (err) {
       setError(err.message);
+    }
+  };
+  const copyText2 = async (text) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setFrpCopied(true);
+      setTimeout(() => setFrpCopied(false), 2e3);
+    } catch {
     }
   };
   const testFrp = async () => {
