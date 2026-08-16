@@ -360,7 +360,7 @@ export async function startNamedTunnel({ port, tunnelName, credsDir, url, home, 
   if (!tunnelName) {
     throw new Error('请填写命名隧道名称（如 live-tunnel）。没有命名隧道？先创建：cloudflared tunnel create <名称>，再绑定域名：cloudflared tunnel route dns <名称> <你的域名> | tunnel name required');
   }
-  const bin = await resolveCloudflared({ home, onPhase, signal });
+  // 先校验凭据再下载二进制：配置错误先报，避免白下载 20MB
   const credFile = await findCloudflaredCredential(credsDir, tunnelName);
   if (!credFile) {
     throw new Error(
@@ -368,6 +368,7 @@ export async function startNamedTunnel({ port, tunnelName, credsDir, url, home, 
       + '请确认隧道名正确，或设置页填写正确的凭据目录 | credential not found for tunnel "' + tunnelName + '"',
     );
   }
+  const bin = await resolveCloudflared({ home, onPhase, signal });
   onPhase('starting');
   const dir = pocketDir(home);
   await mkdir(dir, { recursive: true });
