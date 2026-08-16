@@ -1324,6 +1324,8 @@ function PublicRoutePanel({
   setFrpServerAddr,
   frpServerPort,
   setFrpServerPort,
+  frpVhostPort,
+  setFrpVhostPort,
   frpCustomDomains,
   setFrpCustomDomains,
   frpGen,
@@ -1438,6 +1440,23 @@ function PublicRoutePanel({
         (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 4 }, "\u5C31\u662F\u4F60\u4E91\u670D\u52A1\u5668\u63A7\u5236\u53F0\u663E\u793A\u7684\u300C\u516C\u7F51 IP\u300D\uFF08\u4E70\u670D\u52A1\u5668\u90A3\u5BB6\u7684\u63A7\u5236\u53F0\u91CC\u80FD\u770B\u5230\uFF09| the public IP shown in your cloud console"),
         (0, import_react2.createElement)(
           "div",
+          { style: { marginTop: 8, display: "flex", gap: 8 } },
+          (0, import_react2.createElement)(
+            "div",
+            { style: { flex: 1 } },
+            (0, import_react2.createElement)("div", { style: styles.label }, "\u8BBF\u95EE\u7AEF\u53E3\uFF08\u624B\u673A\u7528\uFF09| Access port"),
+            (0, import_react2.createElement)("input", { style: styles.input, value: frpVhostPort, onChange: (e) => setFrpVhostPort(e.target.value), placeholder: "9527" })
+          ),
+          (0, import_react2.createElement)(
+            "div",
+            { style: { flex: 1 } },
+            (0, import_react2.createElement)("div", { style: styles.label }, "\u901A\u4FE1\u7AEF\u53E3 | Control port"),
+            (0, import_react2.createElement)("input", { style: styles.input, value: frpServerPort, onChange: (e) => setFrpServerPort(e.target.value), placeholder: "7000" })
+          )
+        ),
+        (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 4 }, "\u8BBF\u95EE\u7AEF\u53E3\u9ED8\u8BA4 9527\uFF08\u597D\u8BB0\u3001\u51B7\u95E8\uFF0C\u4E0D\u5360 80\uFF09\uFF1B\u6539\u7AEF\u53E3/\u57DF\u540D\u540E\u8BF7\u91CD\u65B0\u70B9\u300C\u751F\u6210\u90E8\u7F72\u547D\u4EE4\u300D\u5E76\u5728\u670D\u52A1\u5668\u91CD\u8DD1 | default 9527; re-generate the command after changing ports/domain"),
+        (0, import_react2.createElement)(
+          "div",
           { style: { marginTop: 8 } },
           frpGen ? (0, import_react2.createElement)(
             "div",
@@ -1460,11 +1479,11 @@ function PublicRoutePanel({
           "div",
           { style: { marginTop: 8 } },
           (0, import_react2.createElement)("div", { style: styles.label }, "\u4F60\u7684\u57DF\u540D/\u5B50\u57DF\u540D\uFF08\u53EF\u9009\uFF09| Your subdomain (optional)"),
-          (0, import_react2.createElement)("input", { style: styles.input, value: frpCustomDomains, onChange: (e) => setFrpCustomDomains(e.target.value), placeholder: "m.example.com\uFF08\u4E0D\u586B\u5219\u8BBF\u95EE http://\u670D\u52A1\u5668IP:8080\uFF09" }),
+          (0, import_react2.createElement)("input", { style: styles.input, value: frpCustomDomains, onChange: (e) => setFrpCustomDomains(e.target.value), placeholder: "m.example.com\uFF08\u4E0D\u586B\u5219\u8BBF\u95EE http://\u670D\u52A1\u5668IP:9527\uFF09" }),
           (0, import_react2.createElement)(
             "div",
             { style: styles.muted, marginTop: 4 },
-            "\u586B\u4E86\u4E4B\u540E\uFF1A\u628A\u8BE5\u5B50\u57DF\u540D\u7684 A \u8BB0\u5F55\u89E3\u6790\u5230\u670D\u52A1\u5668 IP\uFF0C\u624B\u673A\u8BBF\u95EE http://\u5B50\u57DF\u540D:8080\uFF08frps \u7528 8080 \u7AEF\u53E3\uFF0C\u4E0D\u5360\u7528\u4E3B\u57DF\u540D\u7684 80\uFF09| set an A record of the subdomain to your server IP; visits go to http://sub.domain:8080 \u2014 port 80 stays yours"
+            "\u586B\u4E86\u4E4B\u540E\uFF1A\u628A\u8BE5\u5B50\u57DF\u540D\u7684 A \u8BB0\u5F55\u89E3\u6790\u5230\u670D\u52A1\u5668 IP\uFF0C\u90E8\u7F72\u811A\u672C\u4F1A\u81EA\u52A8\u914D\u7F6E 80 \u7AEF\u53E3\u5206\u6D41\uFF0C\u624B\u673A\u8BBF\u95EE http://\u5B50\u57DF\u540D\uFF08\u4E0D\u5E26\u7AEF\u53E3\uFF1B\u4F60\u4E3B\u57DF\u540D\u7684 80 \u670D\u52A1\u4E0D\u53D7\u5F71\u54CD\uFF09| set an A record to your server IP; the deploy script routes :80 \u2192 frps(:9527) automatically, http://sub.domain works portless"
           )
         ),
         (0, import_react2.createElement)(
@@ -1509,6 +1528,7 @@ function PocketSettingsTab({ rpcCall }) {
   const [frpServerAddr, setFrpServerAddr] = (0, import_react2.useState)("");
   const [frpServerPort, setFrpServerPort] = (0, import_react2.useState)("7000");
   const [frpCustomDomains, setFrpCustomDomains] = (0, import_react2.useState)("");
+  const [frpVhostPort, setFrpVhostPort] = (0, import_react2.useState)("9527");
   const [frpGen, setFrpGen] = (0, import_react2.useState)(null);
   const [frpTest, setFrpTest] = (0, import_react2.useState)(null);
   const [frpTesting, setFrpTesting] = (0, import_react2.useState)(false);
@@ -1613,6 +1633,7 @@ function PocketSettingsTab({ rpcCall }) {
     } : mode === "frp" ? {
       serverAddr: frpServerAddr.trim(),
       serverPort: Number(frpServerPort) || 7e3,
+      vhostPort: frpVhostPort ? Number(frpVhostPort) : void 0,
       customDomains: frpCustomDomains.trim() || void 0
     } : void 0;
     try {
@@ -1631,7 +1652,13 @@ function PocketSettingsTab({ rpcCall }) {
   };
   const genFrps = async () => {
     try {
-      setFrpGen(await call(POCKET_ENDPOINTS.frpGenConfig, {}));
+      setFrpGen(await call(POCKET_ENDPOINTS.frpGenConfig, {
+        config: {
+          vhostPort: frpVhostPort ? Number(frpVhostPort) : void 0,
+          serverPort: frpServerPort ? Number(frpServerPort) : void 0,
+          customDomains: frpCustomDomains.trim() || void 0
+        }
+      }));
     } catch (err) {
       setError(err.message);
     }
@@ -1661,6 +1688,8 @@ function PocketSettingsTab({ rpcCall }) {
       const c = status.frpConfig;
       if (c.serverAddr) setFrpServerAddr((v) => v || c.serverAddr);
       if (c.serverPort) setFrpServerPort((v) => v || String(c.serverPort));
+      if (c.vhostPort) setFrpVhostPort((v) => v || String(c.vhostPort));
+      if (c.customDomains) setFrpCustomDomains((v) => v || c.customDomains);
     }
   }, [status]);
   const lanUrl = status?.lanUrl;
@@ -1750,6 +1779,8 @@ function PocketSettingsTab({ rpcCall }) {
         setFrpServerPort,
         frpCustomDomains,
         setFrpCustomDomains,
+        frpVhostPort,
+        setFrpVhostPort,
         frpGen,
         genFrps,
         frpTest,

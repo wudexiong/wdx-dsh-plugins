@@ -43,6 +43,7 @@ function PublicRoutePanel({
   route, setRoute, detect,
   namedUrl, setNamedUrl,
   frpServerAddr, setFrpServerAddr, frpServerPort, setFrpServerPort,
+  frpVhostPort, setFrpVhostPort,
   frpCustomDomains, setFrpCustomDomains,
   frpGen, genFrps, frpTest, frpTesting, testFrp,
   startTunnel, busy, tunnelStarting, tunnelStateDetail, tunnelStateStarted, tunnelPhase,
@@ -105,6 +106,17 @@ function PublicRoutePanel({
           h('div', { style: styles.label }, '服务器 IP（必填）| Server IP'),
           h('input', { style: styles.input, value: frpServerAddr, onChange: (e) => setFrpServerAddr(e.target.value), placeholder: '123.45.67.89' }),
           h('div', { style: styles.muted, marginTop: 4 }, '就是你云服务器控制台显示的「公网 IP」（买服务器那家的控制台里能看到）| the public IP shown in your cloud console'),
+          h('div', { style: { marginTop: 8, display: 'flex', gap: 8 } },
+            h('div', { style: { flex: 1 } },
+              h('div', { style: styles.label }, '访问端口（手机用）| Access port'),
+              h('input', { style: styles.input, value: frpVhostPort, onChange: (e) => setFrpVhostPort(e.target.value), placeholder: '9527' }),
+            ),
+            h('div', { style: { flex: 1 } },
+              h('div', { style: styles.label }, '通信端口 | Control port'),
+              h('input', { style: styles.input, value: frpServerPort, onChange: (e) => setFrpServerPort(e.target.value), placeholder: '7000' }),
+            ),
+          ),
+          h('div', { style: styles.muted, marginTop: 4 }, '访问端口默认 9527（好记、冷门，不占 80）；改端口/域名后请重新点「生成部署命令」并在服务器重跑 | default 9527; re-generate the command after changing ports/domain'),
           h('div', { style: { marginTop: 8 } },
             frpGen
               ? h('div', null,
@@ -119,9 +131,9 @@ function PublicRoutePanel({
           ),
           h('div', { style: { marginTop: 8 } },
             h('div', { style: styles.label }, '你的域名/子域名（可选）| Your subdomain (optional)'),
-            h('input', { style: styles.input, value: frpCustomDomains, onChange: (e) => setFrpCustomDomains(e.target.value), placeholder: 'm.example.com（不填则访问 http://服务器IP:8080）' }),
+            h('input', { style: styles.input, value: frpCustomDomains, onChange: (e) => setFrpCustomDomains(e.target.value), placeholder: 'm.example.com（不填则访问 http://服务器IP:9527）' }),
             h('div', { style: styles.muted, marginTop: 4 },
-              '填了之后：把该子域名的 A 记录解析到服务器 IP，手机访问 http://子域名:8080（frps 用 8080 端口，不占用主域名的 80）| set an A record of the subdomain to your server IP; visits go to http://sub.domain:8080 — port 80 stays yours'),
+              '填了之后：把该子域名的 A 记录解析到服务器 IP，部署脚本会自动配置 80 端口分流，手机访问 http://子域名（不带端口；你主域名的 80 服务不受影响）| set an A record to your server IP; the deploy script routes :80 → frps(:9527) automatically, http://sub.domain works portless'),
           ),
           h('div', { style: { marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' } },
             h('button', { style: styles.btn, onClick: testFrp, disabled: frpTesting || !frpServerAddr.trim() }, frpTesting ? '测试中…' : '② 测试连接 | Test'),
@@ -159,6 +171,7 @@ function PocketSettingsTab({ rpcCall }) {
   const [frpServerAddr, setFrpServerAddr] = useState('');
   const [frpServerPort, setFrpServerPort] = useState('7000');
   const [frpCustomDomains, setFrpCustomDomains] = useState(''); // 可选：自己的子域名
+  const [frpVhostPort, setFrpVhostPort] = useState('9527'); // 手机访问端口（固定默认，用户可改）
   const [frpGen, setFrpGen] = useState(null); // 一键生成的部署信息 {command, ...}
   const [frpTest, setFrpTest] = useState(null); // 连接测试结果 {ok, error}
   const [frpTesting, setFrpTesting] = useState(false);
@@ -273,6 +286,7 @@ function PocketSettingsTab({ rpcCall }) {
         ? {
             serverAddr: frpServerAddr.trim(),
             serverPort: Number(frpServerPort) || 7000,
+            vhostPort: frpVhostPort ? Number(frpVhostPort) : undefined,
             customDomains: frpCustomDomains.trim() || undefined,
           }
         : undefined;
@@ -289,9 +303,17 @@ function PocketSettingsTab({ rpcCall }) {
     try { setStatus(await call(POCKET_ENDPOINTS.tunnelStop, {})); } catch { /* 忽略 */ }
   };
 
-  // 一键生成 frps 服务器配置（token 自动配对并保存在 host）
+  // 一键生成 frps 服务器端部署配置（token 自动配对并保存在 host；携带当前端口/域名配置）
   const genFrps = async () => {
-    try { setFrpGen(await call(POCKET_ENDPOINTS.frpGenConfig, {})); } catch (err) { setError(err.message); }
+    try {
+      setFrpGen(await call(POCKET_ENDPOINTS.frpGenConfig, {
+        config: {
+          vhostPort: frpVhostPort ? Number(frpVhostPort) : undefined,
+          serverPort: frpServerPort ? Number(frpServerPort) : undefined,
+          customDomains: frpCustomDomains.trim() || undefined,
+        },
+      }));
+    } catch (err) { setError(err.message); }
   };
 
   // 测试 frp 服务器连通性
@@ -322,6 +344,8 @@ function PocketSettingsTab({ rpcCall }) {
       const c = status.frpConfig;
       if (c.serverAddr) setFrpServerAddr((v) => v || c.serverAddr);
       if (c.serverPort) setFrpServerPort((v) => v || String(c.serverPort));
+      if (c.vhostPort) setFrpVhostPort((v) => v || String(c.vhostPort));
+      if (c.customDomains) setFrpCustomDomains((v) => v || c.customDomains);
     }
   }, [status]);
 
@@ -396,6 +420,7 @@ function PocketSettingsTab({ rpcCall }) {
         namedUrl, setNamedUrl,
         frpServerAddr, setFrpServerAddr, frpServerPort, setFrpServerPort,
         frpCustomDomains, setFrpCustomDomains,
+        frpVhostPort, setFrpVhostPort,
         frpGen, genFrps, frpTest, frpTesting, testFrp,
         startTunnel, busy, tunnelStarting, tunnelStateDetail, tunnelStateStarted, tunnelPhase,
         tunnelUrl, tunnelQr: status?.tunnelQr, tunnelMode: status?.tunnelMode, stopTunnel,

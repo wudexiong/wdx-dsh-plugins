@@ -55,8 +55,8 @@ export function installPocketRpc(ctx, { service, log = console, runUpdate = null
         return await statusPayload();
       }
       if (endpoint === POCKET_ENDPOINTS.frpGenConfig) {
-        // 一键生成 frps 服务器配置（token 自动配对）
-        return ok(await service.genFrpsConfig());
+        // 一键生成 frps 部署配置（token 自动配对）：{ config?: { vhostPort, serverPort, customDomains } }
+        return ok(await service.genFrpsConfig(payload?.config ?? {}));
       }
       if (endpoint === POCKET_ENDPOINTS.frpTest) {
         // 测试 frp 服务器连通性：{ config: { serverAddr, serverPort } }

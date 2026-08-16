@@ -516,9 +516,9 @@ export async function resolveFrpc({ frpcPath, home, onPhase = () => {}, signal }
   return downloadFrp(bin, signal);
 }
 
-/** 依据 frp 配置拼一个展示用的公网 URL（http 代理；vhost 端口默认 8080，不占 80）。 */
+/** 依据 frp 配置拼一个展示用的公网 URL（http 代理；vhost 端口默认 9527，不占 80）。 */
 function buildFrpUrl(frp) {
-  const vhost = Number(frp.vhostPort) || 8080;
+  const vhost = Number(frp.vhostPort) > 0 ? Number(frp.vhostPort) : DEFAULT_VHOST_PORT;
   const domain = (frp.customDomains || '').split(',')[0]?.trim();
   if (domain) return `http://${domain}:${vhost}`;
   if (frp.serverAddr) return `http://${frp.serverAddr}:${vhost}`;
@@ -621,15 +621,15 @@ export async function detectNamedTunnelSetup(credsDir) {
 
 /**
  * 一键生成 frps 服务器端配置（含随机 token，与 frpc 自动配对）。
- * vhostHTTPPort 默认 8080（不走 80，避免与主域名已有服务冲突）。
+ * vhostHTTPPort 默认 9527（固定冷门端口，不占 80；用户可在向导配置）。
  */
-export function genFrpsConfig({ token, serverPort = 7000, vhostHttpPort = 8080 } = {}) {
+export function genFrpsConfig({ token, serverPort = 7000, vhostHttpPort = DEFAULT_VHOST_PORT } = {}) {
   const lines = [
     '# frps 配置（由 dsh-wdx-pocket 一键部署脚本/向导生成）',
     `bindPort = ${Number(serverPort) || 7000}`,
     'auth.method = "token"',
     `auth.token = "${token}"`,
-    `vhostHTTPPort = ${Number(vhostHttpPort) || 8080}`,
+    `vhostHTTPPort = ${Number(vhostHttpPort) > 0 ? Number(vhostHttpPort) : DEFAULT_VHOST_PORT}`,
   ];
   return lines.join('\n') + '\n';
 }
@@ -639,11 +639,20 @@ export const FRPS_SETUP_SCRIPT_URL =
   'https://raw.githubusercontent.com/wudexiong/wdx-dsh-plugins/main/packages/pocket/deploy/frps-setup.sh';
 
 /**
- * 生成服务器端一键部署命令（一行）：curl 管道执行 frps-setup.sh，参数自带 token。
- * 国内 raw 下载失败时可用镜像前缀 ghfast.top/ 替换。
+ * 手机访问端口默认值：固定 9527（好记、冷门，避开 80/443/8080/8888 等常见端口）。
+ * 用户可在向导里改成任意端口；部署命令、二维码、URL 全部跟随。
  */
-export function frpsSetupCommand({ token, vhostPort = 8080, bindPort = 7000 } = {}) {
-  return `curl -fsSL ${FRPS_SETUP_SCRIPT_URL} | bash -s -- ${token} ${Number(vhostPort) || 8080} ${Number(bindPort) || 7000}`;
+export const DEFAULT_VHOST_PORT = 9527;
+
+/**
+ * 生成服务器端一键部署命令（一行）：curl 管道执行 frps-setup.sh，参数自带 token。
+ * 端口取自用户配置（默认 9527）；国内 raw 下载失败时可用镜像前缀 ghfast.top/ 替换。
+ */
+export function frpsSetupCommand({ token, vhostPort, bindPort = 7000, subdomain } = {}) {
+  const vhost = Number(vhostPort) > 0 ? Number(vhostPort) : DEFAULT_VHOST_PORT;
+  const bind = Number(bindPort) || 7000;
+  const sub = subdomain && String(subdomain).trim() ? ` ${String(subdomain).trim()}` : '';
+  return `curl -fsSL ${FRPS_SETUP_SCRIPT_URL} | bash -s -- ${token} ${vhost} ${bind}${sub}`;
 }
 
 /**

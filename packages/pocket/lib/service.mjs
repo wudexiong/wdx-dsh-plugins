@@ -21,6 +21,7 @@ import {
   detectNamedTunnelSetup,
   genFrpsConfig,
   frpsSetupCommand,
+  DEFAULT_VHOST_PORT,
   testFrpServer,
   pocketDir,
 } from './tunnel.mjs';
@@ -250,17 +251,21 @@ export function createPocketService({
     },
 
     /**
-     * 一键生成 frps 服务器端部署配置 + 部署命令（token 自动配对，持久化供 frpc 使用）。
+     * 一键生成 frps 服务器端部署配置 + 部署命令。
+     * token 自动配对并持久化；访问端口固定默认 9527（用户可在向导配置）；
+     * 子域名（customDomains）可选，填入后自动带进部署命令（Nginx 分流）。
+     * @param {object} [config] 本次传入的端口/域名配置（合并到已保存配置）
      * @returns {Promise<{toml:string, command:string, serverPort:number, vhostPort:number, tokenMasked:string}>}
      */
-    async genFrpsConfig() {
+    async genFrpsConfig(config = {}) {
       const saved = await getSavedConfig();
-      const frp = saved.frp ?? {};
+      const frp = { ...(saved.frp ?? {}), ...config };
       const token = frp.token && frp.token !== '***' ? frp.token : randomBytes(16).toString('hex');
-      const serverPort = Number(frp.serverPort) || 7000;
-      const vhostPort = Number(frp.vhostPort) || 8080;
+      const serverPort = Number(frp.serverPort) > 0 ? Number(frp.serverPort) : 7000;
+      const vhostPort = Number(frp.vhostPort) > 0 ? Number(frp.vhostPort) : DEFAULT_VHOST_PORT;
+      const subdomain = (frp.customDomains || '').split(',')[0]?.trim() || undefined;
       const toml = genFrpsConfig({ token, serverPort, vhostHttpPort: vhostPort });
-      const command = frpsSetupCommand({ token, vhostPort, bindPort: serverPort });
+      const command = frpsSetupCommand({ token, vhostPort, bindPort: serverPort, subdomain });
       const next = { ...saved, frp: { ...frp, token, serverPort, vhostPort } };
       savedConfig = next;
       await saveConfig(home, next);

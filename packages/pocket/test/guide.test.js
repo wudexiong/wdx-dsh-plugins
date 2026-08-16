@@ -47,16 +47,19 @@ test('readCloudflaredConfigHostname：无 config.yml / 无 hostname → null', a
   }
 });
 
-test('genFrpsConfig / frpsSetupCommand：生成含 token 的配置与一键部署命令', () => {
+test('genFrpsConfig / frpsSetupCommand：固定默认端口 9527 + 子域名参数', () => {
   const toml = genFrpsConfig({ token: 'abc123', serverPort: 7000 });
   assert.ok(toml.includes('bindPort = 7000'), 'bindPort');
   assert.ok(toml.includes('auth.token = "abc123"'), 'token 写入');
-  assert.ok(toml.includes('vhostHTTPPort = 8080'), 'vhostHTTPPort 默认 8080（不占 80）');
+  assert.ok(toml.includes('vhostHTTPPort = 9527'), 'vhostHTTPPort 固定默认 9527（不占 80）');
 
-  const cmd = frpsSetupCommand({ token: 'abc123', vhostPort: 8080, bindPort: 7000 });
+  const cmd = frpsSetupCommand({ token: 'abc123', vhostPort: 9527, bindPort: 7000 });
   assert.ok(cmd.startsWith('curl -fsSL'), '一行 curl 命令');
   assert.ok(cmd.includes('frps-setup.sh'), '指向一键部署脚本');
-  assert.ok(cmd.includes('abc123') && cmd.includes('8080') && cmd.includes('7000'), '参数带 token 与端口');
+  assert.ok(cmd.includes('abc123') && cmd.includes('9527') && cmd.includes('7000'), '参数带 token 与端口');
+
+  const cmdSub = frpsSetupCommand({ token: 't', vhostPort: 9527, bindPort: 7000, subdomain: 'm.example.com' });
+  assert.ok(cmdSub.endsWith('m.example.com'), '子域名作为第 4 个参数追加');
 });
 
 test('testFrpServer：不可达地址返回 ok:false 与中文提示（立即失败不挂起）', async () => {
