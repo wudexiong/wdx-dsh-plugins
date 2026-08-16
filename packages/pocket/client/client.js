@@ -1303,7 +1303,7 @@ var styles = {
   muted: { color: "var(--dsw-alias-label-tertiary,#8b93a1)", fontSize: 12 },
   code: { fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12, wordBreak: "break-all", margin: "4px 0 8px" },
   primary: { font: "inherit", cursor: "pointer", border: "none", background: "var(--dsw-alias-brand-primary,#4f6ef7)", color: "#fff", borderRadius: 8, padding: "6px 14px", fontSize: 13 },
-  btn: { font: "inherit", cursor: "pointer", border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", background: "var(--dsw-alias-bg-layer-1,#fff)", borderRadius: 8, padding: "6px 14px", fontSize: 13 },
+  btn: { font: "inherit", cursor: "pointer", border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", background: "var(--dsw-alias-bg-layer-1,#fff)", color: "var(--dsw-alias-label-primary,#1f2937)", borderRadius: 8, padding: "6px 14px", fontSize: 13 },
   qr: { width: 220, height: 220, borderRadius: 8, border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", margin: "6px 0" },
   warn: { color: "var(--dsw-alias-state-warn-primary,#b45309)", fontSize: 12 },
   input: { font: "inherit", width: "100%", boxSizing: "border-box", border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", background: "var(--dsw-alias-bg-layer-1,#fff)", color: "inherit", borderRadius: 8, padding: "6px 10px", fontSize: 13, marginTop: 4 },
@@ -1455,6 +1455,18 @@ function PublicRoutePanel({
           )
         ),
         (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 4 }, "\u8BBF\u95EE\u7AEF\u53E3\u9ED8\u8BA4 9527\uFF08\u597D\u8BB0\u3001\u51B7\u95E8\uFF0C\u4E0D\u5360 80\uFF09\uFF1B\u6539\u7AEF\u53E3/\u57DF\u540D\u540E\u8BF7\u91CD\u65B0\u70B9\u300C\u751F\u6210\u90E8\u7F72\u547D\u4EE4\u300D\u5E76\u5728\u670D\u52A1\u5668\u91CD\u8DD1 | default 9527; re-generate the command after changing ports/domain"),
+        // 域名输入（可选，放生成按钮前：先填好再生成，生成内容自带子域名）
+        (0, import_react2.createElement)(
+          "div",
+          { style: { marginTop: 8 } },
+          (0, import_react2.createElement)("div", { style: styles.label }, "\u4F60\u7684\u57DF\u540D/\u5B50\u57DF\u540D\uFF08\u53EF\u9009\uFF09| Your subdomain (optional)"),
+          (0, import_react2.createElement)("input", { style: styles.input, value: frpCustomDomains, onChange: (e) => setFrpCustomDomains(e.target.value), placeholder: "m.example.com\uFF08\u4E0D\u586B\u5219\u8BBF\u95EE http://\u670D\u52A1\u5668IP:9527\uFF09" }),
+          (0, import_react2.createElement)(
+            "div",
+            { style: styles.muted, marginTop: 4 },
+            "\u586B\u4E86\u4E4B\u540E\uFF1A\u628A\u8BE5\u5B50\u57DF\u540D\u7684 A \u8BB0\u5F55\u89E3\u6790\u5230\u670D\u52A1\u5668 IP\uFF0C\u90E8\u7F72\u811A\u672C\u4F1A\u81EA\u52A8\u914D\u7F6E 80 \u7AEF\u53E3\u5206\u6D41\uFF0C\u624B\u673A\u8BBF\u95EE http://\u5B50\u57DF\u540D\uFF08\u4E0D\u5E26\u7AEF\u53E3\uFF1B\u4F60\u4E3B\u57DF\u540D\u7684 80 \u670D\u52A1\u4E0D\u53D7\u5F71\u54CD\uFF09| set an A record to your server IP; the deploy script routes :80 \u2192 frps(:9527) automatically, http://sub.domain works portless"
+          )
+        ),
         (0, import_react2.createElement)(
           "div",
           { style: { marginTop: 8 } },
@@ -1491,17 +1503,6 @@ function PublicRoutePanel({
               "\u811A\u672C\u81EA\u52A8\uFF1A\u4E0B\u8F7D frp \u2192 \u88C5\u6210\u7CFB\u7EDF\u670D\u52A1 \u2192 \u5F00\u673A\u81EA\u542F \u2192 \u653E\u884C\u7AEF\u53E3\uFF08\u81EA\u52A8\u9002\u914D\u666E\u901A/\u5B9D\u5854/Docker \u73AF\u5883\uFF09\uFF1B\u5B8C\u6210\u540E\u56DE\u6765\u70B9\u300C\u6D4B\u8BD5\u8FDE\u63A5\u300D| auto: download frp \u2192 systemd \u2192 firewall \u2192 env-aware; then click Test"
             )
           ) : (0, import_react2.createElement)("button", { style: styles.btn, onClick: genFrps }, "\u2460 \u751F\u6210\u90E8\u7F72\u5185\u5BB9 | Generate")
-        ),
-        (0, import_react2.createElement)(
-          "div",
-          { style: { marginTop: 8 } },
-          (0, import_react2.createElement)("div", { style: styles.label }, "\u4F60\u7684\u57DF\u540D/\u5B50\u57DF\u540D\uFF08\u53EF\u9009\uFF09| Your subdomain (optional)"),
-          (0, import_react2.createElement)("input", { style: styles.input, value: frpCustomDomains, onChange: (e) => setFrpCustomDomains(e.target.value), placeholder: "m.example.com\uFF08\u4E0D\u586B\u5219\u8BBF\u95EE http://\u670D\u52A1\u5668IP:9527\uFF09" }),
-          (0, import_react2.createElement)(
-            "div",
-            { style: styles.muted, marginTop: 4 },
-            "\u586B\u4E86\u4E4B\u540E\uFF1A\u628A\u8BE5\u5B50\u57DF\u540D\u7684 A \u8BB0\u5F55\u89E3\u6790\u5230\u670D\u52A1\u5668 IP\uFF0C\u90E8\u7F72\u811A\u672C\u4F1A\u81EA\u52A8\u914D\u7F6E 80 \u7AEF\u53E3\u5206\u6D41\uFF0C\u624B\u673A\u8BBF\u95EE http://\u5B50\u57DF\u540D\uFF08\u4E0D\u5E26\u7AEF\u53E3\uFF1B\u4F60\u4E3B\u57DF\u540D\u7684 80 \u670D\u52A1\u4E0D\u53D7\u5F71\u54CD\uFF09| set an A record to your server IP; the deploy script routes :80 \u2192 frps(:9527) automatically, http://sub.domain works portless"
-          )
         ),
         (0, import_react2.createElement)(
           "div",
