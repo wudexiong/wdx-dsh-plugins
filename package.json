@@ -1,0 +1,14 @@
+{
+  "name": "wdx-dsh-plugins",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Wdx 的 DeepSeek Harness 插件生态（monorepo）：一个插件一个包，独立版本、独立发布。",
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "pnpm -r test",
+    "build": "pnpm -r build:client"
+  }
+}
